@@ -5,6 +5,7 @@
 # use PGC GitHub: orthorectification script https://www.pgc.umn.edu/guides/pgc-coding-and-utilities/using-pgc-github-orthorectification/
 # https://github.com/PolarGeospatialCenter/imagery_utils
 # to run this script the python interpreter must be OSGeo4w to ensure that gdal can be imported from osgeo
+# use images projected in WGS 1984 APS to match REMA DEM projection
 
 import os
 from osgeo import gdal
