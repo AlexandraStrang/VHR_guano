@@ -4,12 +4,13 @@
 
 # use PGC GitHub: orthorectification script https://www.pgc.umn.edu/guides/pgc-coding-and-utilities/using-pgc-github-orthorectification/
 # https://github.com/PolarGeospatialCenter/imagery_utils
-# to run this script the python interpreter must be OSGeo4w to ensure that gdal can be imported from osgeo
+# to run this script the python interpreter must ensure that gdal can be imported from osgeo
 # use images projected in WGS 1984 APS to match REMA DEM projection
 
 import os
 from osgeo import gdal
 import subprocess
+import numpy as np
 
 # find input and output directories
 maxar_images = r'D:\Ortho\vhr_images_3031'
@@ -22,7 +23,7 @@ colony_to_dem = {
     'Cape_Adare': '10_34_2_1_2m_v2.0',
     'Cape_Crozier': '17_33_2_2_2m_v2.0',
     'Cape_Bird': '17_34_1_1_2m_v2.0',
-    'Cape_Hallett': '11_34_2_1_2m_v2.0',
+    'Cape_Hallett': '11_34_2_1_2m_v2.0', # DEM wasn't in folder?
     'Cape_Royds': '17_34_2_1_2m_v2.0',
     'Coulman_Middle': '13_34_1_1_2m_v2.0',
     'Coulman_North': '13_34_1_1_2m_v2.0',
@@ -46,40 +47,41 @@ def lookup_dem(image):
     return matches[0]
 
 # check that colonies and DEMs match up 
-print(lookup_dem('Coulman_2011_1.tif')) # should be incorrect
+#print(lookup_dem('Coulman_2011_1.tif')) # should be incorrect
 print(lookup_dem('Crozier_2011_1.tif')) # should print Crozier DEM name
 
 # list all VHR images in the input directory
 vhr_files = [i for i in os.listdir(maxar_images) if i.lower().endswith('.tif')]
 
 # find pgc_ortho.py script
-pcg_ortho_path = os.path.join('D:', 'Ortho', "pgc_ortho.py") # path to PGC script
-print(pcg_ortho_path) 
+PGC_ORTHO_IMAGE_UTILS_PATH = r"D:\Ortho\imagery_utils"
+# pgc_ortho_path = os.path.join('D:', 'Ortho', "pgc_ortho.py") # path to PGC script
 
 # find OSGeo4w path for python interpeter 
-env_dir = r'C:\OSGeo4W\bin\python.exe'
+# env_dir = r'C:\OSGeo4W\bin\python.exe'
 
 # run script for each VHR image
 for image in vhr_files:
     image_path = os.path.join(maxar_images, image)
     try:
-        dem_path = os.path.join(dem_files, f'{lookup_dem(image)}.tif')
-        output_path = os.path.join(ortho_images, f'ortho_{image}')
-
+        python_path = r'C:\Users\astra\miniforge3\envs\pgc_test\python.exe'
+        dem_path = os.path.join(dem_files, f'{lookup_dem(image)}_dem.tif')
+        output_path = os.path.join(ortho_images)
+        command = [python_path, os.path.join(PGC_ORTHO_IMAGE_UTILS_PATH, 'pgc_ortho.py')]
         # Command to run PGC orthorectification script
-        command = [
-             env_dir, pgc_ortho_path,
+        command = [ python_path, os.path.join(PGC_ORTHO_IMAGE_UTILS_PATH, 'pgc_ortho.py'),
+                   #image_path, output_path,
+                r"D:\Maxar_Images_20220420\014666468010_01\014666468010_01_P001_PSH\10JAN19200728-S2AS-014666468010_01_P001.TIF", 
+                output_path,
             "--epsg", "3031", # images need to match DEM projection of epsg=3031
-            "--image", image_path,
             "--dem", dem_path,
-            "--output", output_path
+            
         ]
 
         # run the script with handling error
         subprocess.run(command, check=True)
-        print(f"Successfully processed: {image}")
-    
     except AssertionError as e:
         print(f"Skipping {image}: {e}")
     except subprocess.CalledProcessError as e:
         print(f"Error processing {image}: {e}")
+    break
