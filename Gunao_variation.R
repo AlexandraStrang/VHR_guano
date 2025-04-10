@@ -463,6 +463,7 @@ summary_table <- Dataset.1.4 %>%
   group_by(Colony_code, Season) %>%
   summarise(n = n(),
             mean_GA = mean(GA),
+            median_GA = median(GA),
             sd = sd(GA))
 
 # Create a table plot
@@ -472,4 +473,34 @@ table_plot <- ggtexttable(summary_table, rows = NULL)
 plot(table_plot)
 
 # The larger the colony, the larger the variation
+# Try removing shadowed estimates (Adare 2020 4 and 5)
 
+# Remove rows where Adare guano stain is over 500,000 m2
+# Might be a better way to do this
+Dataset.1.5 <- Dataset.1.4 %>% filter(GA <= 500000)
+View(Dataset.1.5)
+
+# Table without shadowed 
+summary_table2 <- Dataset.1.5 %>%
+  group_by(Colony_code, Season) %>%
+  summarise(n = n(),
+            mean_GA = mean(GA),
+            median_GA = median(GA),
+            sd = sd(GA))
+
+# Create a table plot
+table_plot2 <- ggtexttable(summary_table2, rows = NULL)
+
+# Show table in Plots window
+plot(table_plot2)
+
+
+# Produce non-linear growth model with nls() or nlgm() 
+
+nls()
+
+library(nlgm)
+
+nlgm
+
+# or build manually in python 
