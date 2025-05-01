@@ -21,13 +21,16 @@ DEM_FILES_DIR = r'D:\Ortho\rema_dems'
 PYTHON_PATH = r'C:\Users\astra\miniforge3\envs\pgc_test\python.exe'
 OUTPUT_DIR = r'D:\Ortho\ortho_16_rf'
 
-# run for DG images
+# run for Digital Globe images
 MAXAR_IMAGES_2022_DIR = r'D:\VHR_Images\Maxar_Images_20220420'
 MAXAR_IMAGES_2024_DIR = r'D:\VHR_Images\Maxar_Images_20241219'
 
-# find metadata paths
+
 @dataclass
 class TifXmlFilePaths:
+    """
+    storing metadata paths
+    """
     tif_path: str
     xml_metadata_path: str
     xml_readme_path: str
@@ -35,8 +38,11 @@ class TifXmlFilePaths:
     def __post_init__(self): 
         assert all(os.path.isfile(f) for f in [self.tif_path, self.xml_metadata_path, self.xml_readme_path])
 
-# command for running pgc ortho script
+
 def run_pgc_ortho(dem_file_path, image_file_path, output_dir, dry_run: bool = False):
+    """
+    command for running pgc ortho script
+    """
     output_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(image_file_path))[0])
     os.makedirs(output_dir)
     command = [PYTHON_PATH,
@@ -51,8 +57,11 @@ def run_pgc_ortho(dem_file_path, image_file_path, output_dir, dry_run: bool = Fa
         command.append("--dryrun")
     return subprocess.run(command).returncode == 0
 
-# match tif and xml readme
+
 def get_tif_xml_files(path) -> list[TifXmlFilePaths]:
+    """
+    match tif and xml readme
+    """
     tif_files = []
     for root, _, files in os.walk(path):
         for file in files:
@@ -64,22 +73,27 @@ def get_tif_xml_files(path) -> list[TifXmlFilePaths]:
                 tif_files.append(tif_xml_paths)
     return tif_files
 
-# area name for DEM matching from xml readme
+
 def get_area_name(xml_readme_path: str):
+    """
+    area name used for DEM matching from xml readme
+    """
     xml_tree = xml.etree.ElementTree.parse(xml_readme_path)
     root = xml_tree.getroot()
     area_element = root.find('AREADESCRIPTION')
     return area_element.text.replace(' ', '_')
 
-# match DEM to images using area name from xml readme
-# image to DEM dictionary
+
 def get_dem_file(tif_xml_paths: TifXmlFilePaths):
-    colony_to_dem = {
+    """
+    match DEM to images using area name from xml readme
+    """
+    colony_to_dem = {  # image to DEM dictionary
         'Beaufort_Island': '17_34_1_1_2m_v2.0',
-        'Cape_Adare': '10_34_2_1_2m_v2.0', # not needed
+        'Cape_Adare': '10_34_2_1_2m_v2.0',  # not needed (use ortho mosaic instead)
         'Cape_Crozier': '17_33_2_2_2m_v2.0',
         'Cape_Bird': '17_34_1_1_2m_v2.0',
-        'Cape_Hallet': '11_34_2_1_2m_v2.0', # typo in order Hallett
+        'Cape_Hallet': '11_34_2_1_2m_v2.0',  # typo in order Hallett
         'Cape_Royds': '17_34_2_1_2m_v2.0',
         'Coulman_Middle': '13_34_1_1_2m_v2.0',
         'Coulman_North': '13_34_1_1_2m_v2.0',
@@ -89,23 +103,27 @@ def get_dem_file(tif_xml_paths: TifXmlFilePaths):
         'Inexpressible_Island': '15_35_1_2_2m_v2.0',
         'Possession_Island': '11_34_1_1_2m_v2.0',
         'Sven_Island': '11_34_1_1_2m_v2.0',
-        'Terra_Nova': '14_35_2_2_2m_v2.0', # not needed
+        'Terra_Nova': '14_35_2_2_2m_v2.0',  # not needed (use ortho mosaic instead)
     }
     area_name = get_area_name(tif_xml_paths.xml_readme_path)
     try:
-        dem_file = next(v for k,v in colony_to_dem.items() if k in area_name) + "_dem.tif"
+        dem_file = next(v for k, v in colony_to_dem.items() if k in area_name) + "_dem.tif"
     except StopIteration:
         raise RuntimeError(f"Area name not matched: {area_name}")
     dem_path = os.path.join(DEM_FILES_DIR, dem_file)
     assert os.path.isfile(dem_path), f'{dem_file} does not exist'
     return dem_path
 
-# run for DG images
+
+# run for Digital Globe images (2022 and 2024 order)
 for f in get_tif_xml_files(MAXAR_IMAGES_2022_DIR) + get_tif_xml_files(MAXAR_IMAGES_2024_DIR):
     status = run_pgc_ortho(get_dem_file(f), f.tif_path, OUTPUT_DIR)
     print(f"{'OK' if status else 'FAILED':<10}" f"{f.tif_path}")
 
+
 """
+Ran manually for orthomosaic DEM
+
 Run Terra Nova images with mosaic DEM
 TERRA_NOVA_DEM_FILE_DIR = "D:\Ortho\rema_dems\Terra_nova\terra_nova.tif"
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Terra_nova\terra_nova.tif D:\VHR_Images\Maxar_Images_20241219\050272141450_01\050272141450_01_P001_PSH\15DEC29211407-S2AS-050272141450_01_P001.tif D:\Ortho\ortho_16_rf\15DEC29211407-S2AS-050272141450_01_P001
@@ -114,8 +132,7 @@ python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Terra_nova\ter
 
 Warning 1: The definition of projected CRS EPSG:3031 got from GeoTIFF keys is not the same as the one from the EPSG registry, which may cause issues during reprojection operations. Set GTIFF_SRS_SOURCE configuration option to EPSG to use official parameters (overriding the ones from GeoTIFF keys), or to GEOKEYS to use custom values from GeoTIFF keys and drop the EPSG code.
 
-"""
-"""
+
 Run Cape Adare images with mosaic DEM
 CAPE_ADARE_DEM_FILE_DIR = "D:\Ortho\rema_dems\Cape_adare\cape_adare.tif"
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Cape_adare\cape_adare.tif D:\VHR_Images\Maxar_Images_20241219\050272141050_01\050272141050_01_P001_PSH\12JAN08210317-S2AS-050272141050_01_P001.tif D:\Ortho\ortho_16_rf\12JAN08210317-S2AS-050272141050_01_P001
@@ -127,23 +144,33 @@ python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Cape_adare\cap
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Cape_adare\cape_adare.tif D:\VHR_Images\Maxar_Images_20241219\050272141110_01\050272141110_01_P001_PSH\21FEB13210309-S2AS-050272141110_01_P001.tif D:\Ortho\ortho_16_rf\21FEB13210309-S2AS-050272141110_01_P001
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Cape_adare\cape_adare.tif D:\VHR_Images\Maxar_Images_20241219\050272141120_01\050272141120_01_P001_PSH\23DEC03220040-S2AS-050272141120_01_P001.tif D:\Ortho\ortho_16_rf\23DEC03220040-S2AS-050272141120_01_P001
 
-Warning 1: The definition of projected CRS EPSG:3031 got from GeoTIFF keys is not the same as the one from the EPSG registry, which may cause issues during reprojection operations. Set GTIFF_SRS_SOURCE configuration option to EPSG to use official parameters (overriding the ones from GeoTIFF keys), or to GEOKEYS to use custom values from GeoTIFF keys and drop the EPSG code.
+Warning 1: The definition of projected CRS EPSG:3031 got from GeoTIFF keys is not the same as the one from the EPSG registry, which may cause issues during reprojection operations. 
+Set GTIFF_SRS_SOURCE configuration option to EPSG to use official parameters (overriding the ones from GeoTIFF keys), or to GEOKEYS to use custom values from GeoTIFF keys and drop the EPSG code.
 
-"""
-"""
-Run IKO1 images (Cape Crozier)
-IK01_IMAGE_1_DIR = r'D:\VHR_Images\Maxar_Ikonos_20241219\Cape_Crozier_1\2011120221030920000011607365\po_1495866_0000000\po_1495866_bgrn_0000000.tif'
-IK01_IMAGE_2_DIR = r'D:\VHR_Images\Maxar_Ikonos_20241219\Cape_Crozier_4\2012022921450540000011624223\po_1505906_0000000\po_1505906_bgrn_0000000.tif'
-IK01_DEM_FILE_DIR = r'D:\Ortho\rema_dems\Cape_crozier\cape_crozier.tif'
+
+Run IKO2 images (Cape Crozier)
+IK02_IMAGE_1_DIR = r'D:\VHR_Images\Maxar_Ikonos_20241219\Cape_Crozier_1\2011120221030920000011607365\po_1495866_0000000\po_1495866_bgrn_0000000.tif'
+IK02_IMAGE_2_DIR = r'D:\VHR_Images\Maxar_Ikonos_20241219\Cape_Crozier_4\2012022921450540000011624223\po_1505906_0000000\po_1505906_bgrn_0000000.tif'
+IK02_DEM_FILE_DIR = r'D:\Ortho\rema_dems\Cape_crozier\cape_crozier.tif'
 
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Cape_crozier\cape_crozier.tif D:\VHR_Images\Maxar_Ikonos_20241219\Cape_Crozier_1\2011120221030920000011607365\po_1495866_0000000\po_1495866_bgrn_0000000.tif D:\Ortho\ortho_16_rf\2011120221030920000011607365
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Cape_crozier\cape_crozier.tif D:\VHR_Images\Maxar_Ikonos_20241219\Cape_Crozier_4\2012022921450540000011624223\po_1505906_0000000\po_1505906_bgrn_0000000.tif D:\Ortho\ortho_16_rf\2012022921450540000011624223
 
-Warning 1: The definition of projected CRS EPSG:3031 got from GeoTIFF keys is not the same as the one from the EPSG registry, which may cause issues during reprojection operations. Set GTIFF_SRS_SOURCE configuration option to EPSG to use official parameters (overriding the ones from GeoTIFF keys), or to GEOKEYS to use custom values from GeoTIFF keys and drop the EPSG code.
+Warning 1: The definition of projected CRS EPSG:3031 got from GeoTIFF keys is not the same as the one from the EPSG registry, which may cause issues during reprojection operations. 
+Set GTIFF_SRS_SOURCE configuration option to EPSG to use official parameters (overriding the ones from GeoTIFF keys), or to GEOKEYS to use custom values from GeoTIFF keys and drop the EPSG code.
 
-Manually find IK metadata
+Have to manually find IK metadata in pgc_ortho.py and insert siid:
  match = re.search(regex, os.path.basename(metafile.lower()))
     if match:
         siid = "INSERT Source Image ID"
+
+
+Update:
+Re do three Inexpressibe Island images without reflectance correction to see if it fixes segmentation issues
+Use -c ns for no stretch instead of -c rf
+Inex_DEM_FILE_DIR = "D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif"
+python pgc_ortho.py -p 3031 -t UInt16 -c ns -d D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif D:\VHR_Images\Maxar_Images_20220420\014666468280_01\014666468280_01_P001_PSH\13DEC04220240-S2AS-014666468280_01_P001.tif D:\Ortho\ortho_16_INEX\13DEC04220240-S2AS-014666468280_01_P001
+python pgc_ortho.py -p 3031 -t UInt16 -c ns -d D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif D:\VHR_Images\Maxar_Images_20220420\014666468300_01\014666468300_01_P001_PSH\18FEB21203155-S2AS-014666468300_01_P001.tif D:\Ortho\ortho_16_INEX\18FEB21203155-S2AS-014666468300_01_P001
+python pgc_ortho.py -p 3031 -t UInt16 -c ns -d D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif D:\VHR_Images\Maxar_Images_20220420\014666468320_01\014666468320_01_P001_PSH\19JAN10205644-S2AS-014666468320_01_P001.tif D:\Ortho\ortho_16_INEX\19JAN10205644-S2AS-014666468320_01_P001
 
 """
