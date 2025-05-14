@@ -4,8 +4,8 @@
 
 # use PGC GitHub: orthorectification script https://www.pgc.umn.edu/guides/pgc-coding-and-utilities/using-pgc-github-orthorectification/
 # open folder https://github.com/PolarGeospatialCenter/imagery_utils
-# to run this script the python interpreter come from imagery utils
-# conda environmenet pgc_test
+# to run this script the python interpreter comes from imagery utils
+# used a conda environmenet = pgc_test
 # reprojects image in WGS 1984 Antartic Polar Stereographic to match REMA DEM projection
 
 import os
@@ -15,7 +15,7 @@ import subprocess
 from dataclasses import dataclass
 import xml
 
-# find directories and paths
+# directories and paths
 PGC_ORTHO_IMAGE_UTILS_PATH = r'D:\Ortho\imagery_utils'
 DEM_FILES_DIR = r'D:\Ortho\rema_dems'
 PYTHON_PATH = r'C:\Users\astra\miniforge3\envs\pgc_test\python.exe'
@@ -48,10 +48,10 @@ def run_pgc_ortho(dem_file_path, image_file_path, output_dir, dry_run: bool = Fa
     command = [PYTHON_PATH,
                os.path.join(PGC_ORTHO_IMAGE_UTILS_PATH, 'pgc_ortho.py'),
                image_file_path,
-               output_dir, # default resample is nearest neighbour
-               "--epsg", "3031", # needs to match DEM projection of epsg=3031
-               "-t", "UInt16", # 16-bit output
-               "-c", "rf", # reflectance correction
+               output_dir,  # default resample is nearest neighbour
+               "--epsg", "3031",  # needs to match DEM projection of epsg=3031
+               "-t", "UInt16",  # 16-bit output
+               "-c", "rf",  # reflectance correction for snow
                "--dem", dem_file_path]
     if dry_run:
         command.append("--dryrun")
@@ -122,7 +122,7 @@ for f in get_tif_xml_files(MAXAR_IMAGES_2022_DIR) + get_tif_xml_files(MAXAR_IMAG
 
 
 """
-Ran manually for orthomosaic DEM
+Ran manually for orthomosaic DEMs
 
 Run Terra Nova images with mosaic DEM
 TERRA_NOVA_DEM_FILE_DIR = "D:\Ortho\rema_dems\Terra_nova\terra_nova.tif"
@@ -130,7 +130,8 @@ python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Terra_nova\ter
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Terra_nova\terra_nova.tif D:\VHR_Images\Maxar_Images_20241219\050272141460_01\050272141460_01_P001_PSH\21JAN05215921-S2AS-050272141460_01_P001.tif D:\Ortho\ortho_16_rf\21JAN05215921-S2AS-050272141460_01_P001
 python pgc_ortho.py -p 3031 -t UInt16 -c rf -d D:\Ortho\rema_dems\Terra_nova\terra_nova.tif D:\VHR_Images\Maxar_Images_20241219\050272141470_01\050272141470_01_P001_PSH\24FEB01211801-S2AS-050272141470_01_P001.tif D:\Ortho\ortho_16_rf\24FEB01211801-S2AS-050272141470_01_P001
 
-Warning 1: The definition of projected CRS EPSG:3031 got from GeoTIFF keys is not the same as the one from the EPSG registry, which may cause issues during reprojection operations. Set GTIFF_SRS_SOURCE configuration option to EPSG to use official parameters (overriding the ones from GeoTIFF keys), or to GEOKEYS to use custom values from GeoTIFF keys and drop the EPSG code.
+Warning 1: The definition of projected CRS EPSG:3031 got from GeoTIFF keys is not the same as the one from the EPSG registry, which may cause issues during reprojection operations. 
+Set GTIFF_SRS_SOURCE configuration option to EPSG to use official parameters (overriding the ones from GeoTIFF keys), or to GEOKEYS to use custom values from GeoTIFF keys and drop the EPSG code.
 
 
 Run Cape Adare images with mosaic DEM
@@ -163,14 +164,4 @@ Have to manually find IK metadata in pgc_ortho.py and insert siid:
  match = re.search(regex, os.path.basename(metafile.lower()))
     if match:
         siid = "INSERT Source Image ID"
-
-
-Update:
-Re do three Inexpressibe Island images without reflectance correction to see if it fixes segmentation issues
-Use -c ns for no stretch instead of -c rf
-Inex_DEM_FILE_DIR = "D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif"
-python pgc_ortho.py -p 3031 -t UInt16 -c ns -d D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif D:\VHR_Images\Maxar_Images_20220420\014666468280_01\014666468280_01_P001_PSH\13DEC04220240-S2AS-014666468280_01_P001.tif D:\Ortho\ortho_16_INEX\13DEC04220240-S2AS-014666468280_01_P001
-python pgc_ortho.py -p 3031 -t UInt16 -c ns -d D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif D:\VHR_Images\Maxar_Images_20220420\014666468300_01\014666468300_01_P001_PSH\18FEB21203155-S2AS-014666468300_01_P001.tif D:\Ortho\ortho_16_INEX\18FEB21203155-S2AS-014666468300_01_P001
-python pgc_ortho.py -p 3031 -t UInt16 -c ns -d D:\Ortho\rema_dems\15_35_1_2_2m_v2.0_dem.tif D:\VHR_Images\Maxar_Images_20220420\014666468320_01\014666468320_01_P001_PSH\19JAN10205644-S2AS-014666468320_01_P001.tif D:\Ortho\ortho_16_INEX\19JAN10205644-S2AS-014666468320_01_P001
-
 """
