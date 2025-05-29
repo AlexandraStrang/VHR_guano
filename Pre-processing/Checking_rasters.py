@@ -13,8 +13,6 @@ from matplotlib.colors import ListedColormap
 
 # directories and paths
 raster_folder = r"D:\Guano_rasters"
-vat_path = r"D:\Guano_rasters\VAT_guano_rasters"
-output_csv = r"D:\Guano_rasters\raster_classes.csv"
 cleaned_rasters = r"D:\Guano_rasters\Clean_guano_rasters"
 
 # colormap for plotting values 0, 1, 2
