@@ -44,18 +44,28 @@ class Params:
         self.guano_folder = os.path.join(self.inputDataPath, 'clean_guano_rasters')
         self.terrain_folder = os.path.join(self.inputDataPath, 'colony_terrain_rasters')
 
-        ## GUANO AND DEM DATA FILES
-        self.CrozierGuanoPath = os.path.join(self.guano_folder, 'cleaned_Crozier_2020_1_3031.tif')
-        self.RoydsGuanoPath = os.path.join(self.guano_folder, 'cleaned_Royds_2020_1_3031.tif')
-        self.CrozierDEMPath = os.path.join(self.terrainPath, 'Cape_Crozier',
+        ## GUANO, DEM DATA FILES AND POINT SHAPEFILES
+        self.CrozierGuanoFName = os.path.join(self.guano_folder, 'cleaned_Crozier_2020_1_3031.tif')
+        self.RoydsGuanoFName = os.path.join(self.guano_folder, 'cleaned_Royds_2020_1_3031.tif')
+        self.CrozierDEMFName = os.path.join(self.terrainPath, 'Cape_Crozier',
             'Cape_Crozier_clipped.tif')
-        self.RoydsDEMPath = os.path.join(self.terrainPath, 'Cape_Royds',
+        self.RoydsDEMFName = os.path.join(self.terrainPath, 'Cape_Royds',
             'Cape_Royds_clipped.tif')
-        ## OUTPUT DATA PATHS
+        self.CrozierPointsFName = os.path.join(self.inputDataPath, '2020_UAV_points',
+            'croz_masked_labels_cleaned_coords_added_2020-11-29',
+            'croz_masked_labels_cleaned_coords_added_2020-11-29.shp')
+        self.RoydsPointsFName = os.path.join(self.inputDataPath, '2020_UAV_points',
+            'royd_masked_labels_cleaned_coords_added_2020-12-01',
+            'royd_masked_labels_cleaned_coords_added_2020-12-01.shp')
+
+        ## OUTPUT DATA PATHS AND FILENAMES
         self.outputDataPath = os.path.join(os.getenv('ADELIEPROJDIR', default = '.'), 
-            'Alexandra_Data', 'Results_GuanoTerrain')
-        self.Crozier2mData = os.path.join(self.outputDataPath, 'CrozierGuano_2m.tif')
-        self.Royds2mData = os.path.join(self.outputDataPath, 'RoydsGuano_2m.tif')
+            'Alexandra_Data', 'Results_GuanoTerrain', 'Rasters_2m')
+        self.CrozierGuano2m = os.path.join(self.outputDataPath, 'CrozierGuano_2m.tif')
+        self.RoydsGuano2m = os.path.join(self.outputDataPath, 'RoydsGuano_2m.tif')
+        self.CrozierPenguin2m = os.path.join(self.outputDataPath, 'CrozierPenguinCounts_2m.tif')
+        self.RoydsPenguin2m = os.path.join(self.outputDataPath, 'RoydsPenguinCounts_2m.tif')
+
         # ## MAKE NEW RESULTS DIRECTORY IF DOESN'T EXIST
         if not os.path.isdir(self.outputDataPath):
             os.makedirs(self.outputDataPath)
@@ -73,6 +83,7 @@ class DataProcessor:
         #############################
         ## RUN FUNCTIONS
         self.WarpRasters()
+        self.makePenguinCountRaster()
 
         ## END RUNNING 
         #############################
@@ -83,11 +94,11 @@ class DataProcessor:
         """
         for col in self.params.colonies:
             ## GET ATTRIBUTE TO RIGHT COLONY
-            guanoPath = getattr(self.params, '{}GuanoPath'.format(col))
+            guanoFName = getattr(self.params, '{}GuanoFName'.format(col))
             guanoOut2m = getattr(self.params, {}2mData.format(col)
-            print('guanoPath', guanoPath, guanoOut2m)
+            print('guanoFName', guanoFName, guanoOut2m)
             ## READ IN GUANO RASTER AND RECLASS
-            src_ds = gdal.Open(guanoPath)
+            src_ds = gdal.Open(guanoFName)
             band = src_ds.GetRasterBand(1)
             data = band.ReadAsArray()
             data[data == 2] = 0
@@ -100,9 +111,10 @@ class DataProcessor:
             mem_ds.GetRasterBand(1).WriteArray(data)
 
             ## READ IN COLONY DEM
-            demPath = getattr(self.params, '{}DEMPath'.format(col))
-            print('demPath', demPath)
+            demFName = getattr(self.params, '{}DEMFName'.format(col))
+            print('demFName', demFName)
 
+            ## REPROJECT RASTERS TO 2 M
             gdal.Warp(destNameOrDestDS=guanoOut2m,
                     srcDSOrSrcDSTab=mem_ds,
                     format='GTiff',
@@ -120,7 +132,50 @@ class DataProcessor:
                     targetAlignedPixels=True,
                     outputBoundsSRS='EPSG:3031',
                     srcNodata=-9999)
-    
+
+    def makePenguinCountRaster(self):
+        """
+        ## READ IN SHAPEFILE, AND GET COUNTS AT 2-M RESOLUTION
+        """
+        for col in self.params.colonies:    
+            ## GET DATA NAMES AND PATHS
+            demFName = getattr(self.params, '{}DEMFName'.format(col))
+            print('demFName', demFName)
+            ptShpFName = getattr(self.params, '{}PointsFName'.format(col))
+            counts2mFName = getattr(self.params, '{}Penguin2m'.format(col))
+            print('demFName:', demFName, 'shp name:', ptShpFName, 'count name:', counts2mFName)
+
+            # Open DEM to get georeferencing and size
+            dem_ds = gdal.Open(demFName)
+            geotransform = dem_ds.GetGeoTransform()
+            projection = dem_ds.GetProjection()
+#            x_min = geotransform[0]
+#            y_max = geotransform[3]
+            x_res = dem_ds.RasterXSize
+            y_res = dem_ds.RasterYSize
+
+            # Create in-memory target raster
+            nodata_value = 65535
+            mem_driver = gdal.GetDriverByName("MEM")
+            target_ds = mem_driver.Create("", x_res, y_res, 1, gdal.GDT_UInt16)
+            target_ds.SetGeoTransform(geotransform)
+            target_ds.SetProjection(projection)
+            band = target_ds.GetRasterBand(1)
+            band.Fill(nodata_value)
+            band.SetNoDataValue(nodata_value)
+
+            # Rasterize using point count per pixel
+            shp_ds = ogr.Open(ptShpFName)
+            layer = shp_ds.GetLayer()
+            gdal.RasterizeLayer(target_ds, [1],
+                                layer,
+                                burn_values=[1],
+                                options=["ALL_TOUCHED=TRUE"],  
+                                mergeAlg=gdal.GRA_Add)  # Count all overlapping points
+            # Save to disk
+            gtiff_driver = gdal.GetDriverByName("GTiff")
+            gtiff_driver.CreateCopy(counts2mFName, target_ds)
+
 
 def main():
     params = Params()
