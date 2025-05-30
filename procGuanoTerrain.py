@@ -25,12 +25,10 @@
 import os
 import json
 import numpy as np
-import pandas as pd
+from numba import njit
 from osgeo import gdal, ogr, osr
-from osgeo import gdal_array
-from datetime import datetime
-from glob import glob
 import resource
+from pathlib import Path
 
 osr.UseExceptions()
 gdal.UseExceptions()
@@ -45,11 +43,13 @@ class Params:
         self.terrain_folder = os.path.join(self.inputDataPath, 'colony_terrain_rasters')
 
         ## GUANO, DEM DATA FILES AND POINT SHAPEFILES
-        self.CrozierGuanoFName = os.path.join(self.guano_folder, 'cleaned_Crozier_2020_1_3031.tif')
-        self.RoydsGuanoFName = os.path.join(self.guano_folder, 'cleaned_Royds_2020_1_3031.tif')
-        self.CrozierDEMFName = os.path.join(self.terrainPath, 'Cape_Crozier',
+        self.CrozierGuanoFName = os.path.join(self.guano_folder, 
+            'cleaned_Crozier_2020_1_3031_guano.tif')
+        self.RoydsGuanoFName = os.path.join(self.guano_folder, 
+            'cleaned_Royds_2020_1_3031_guano.tif')
+        self.CrozierDEMFName = os.path.join(self.terrain_folder, 'Cape_Crozier',
             'Cape_Crozier_clipped.tif')
-        self.RoydsDEMFName = os.path.join(self.terrainPath, 'Cape_Royds',
+        self.RoydsDEMFName = os.path.join(self.terrain_folder, 'Cape_Royds',
             'Cape_Royds_clipped.tif')
         self.CrozierPointsFName = os.path.join(self.inputDataPath, '2020_UAV_points',
             'croz_masked_labels_cleaned_coords_added_2020-11-29',
@@ -60,7 +60,7 @@ class Params:
 
         ## OUTPUT DATA PATHS AND FILENAMES
         self.outputDataPath = os.path.join(os.getenv('ADELIEPROJDIR', default = '.'), 
-            'Alexandra_Data', 'Results_GuanoTerrain', 'Rasters_2m')
+            'Dean_Data', 'Results_GuanoTerrain', 'Rasters_2m')
         self.CrozierGuano2m = os.path.join(self.outputDataPath, 'CrozierGuano_2m.tif')
         self.RoydsGuano2m = os.path.join(self.outputDataPath, 'RoydsGuano_2m.tif')
         self.CrozierPenguin2m = os.path.join(self.outputDataPath, 'CrozierPenguinCounts_2m.tif')
@@ -82,7 +82,7 @@ class DataProcessor:
 
         #############################
         ## RUN FUNCTIONS
-        self.WarpRasters()
+#        self.WarpRasters()
         self.makePenguinCountRaster()
 
         ## END RUNNING 
@@ -95,8 +95,12 @@ class DataProcessor:
         for col in self.params.colonies:
             ## GET ATTRIBUTE TO RIGHT COLONY
             guanoFName = getattr(self.params, '{}GuanoFName'.format(col))
-            guanoOut2m = getattr(self.params, {}2mData.format(col)
-            print('guanoFName', guanoFName, guanoOut2m)
+            guanoOut2m = getattr(self.params, '{}Guano2m'.format(col))
+            print('guanoFName', guanoFName, 'Out', guanoOut2m)
+            ## FIND IN COLONY DEM
+            demFName = getattr(self.params, '{}DEMFName'.format(col))
+            print('demFName', demFName)
+
             ## READ IN GUANO RASTER AND RECLASS
             src_ds = gdal.Open(guanoFName)
             band = src_ds.GetRasterBand(1)
@@ -110,25 +114,33 @@ class DataProcessor:
             mem_ds.SetProjection(src_ds.GetProjection())
             mem_ds.GetRasterBand(1).WriteArray(data)
 
-            ## READ IN COLONY DEM
-            demFName = getattr(self.params, '{}DEMFName'.format(col))
-            print('demFName', demFName)
+            ## OPEN DEM TO GET EXTENT AND BOUNDS
+            dem_ds = gdal.Open(demFName)
+            dem_gt = dem_ds.GetGeoTransform()
+            x_min = dem_gt[0]
+            y_max = dem_gt[3]
+            pixel_width = dem_gt[1]
+            pixel_height = dem_gt[5]
+            x_size = dem_ds.RasterXSize
+            y_size = dem_ds.RasterYSize
+            ## BOUNDING BOX
+            x_max = x_min + (x_size * pixel_width)
+            y_min = y_max + (y_size * pixel_height)
 
             ## REPROJECT RASTERS TO 2 M
             gdal.Warp(destNameOrDestDS=guanoOut2m,
                     srcDSOrSrcDSTab=mem_ds,
                     format='GTiff',
                     xRes=2.0,
-                    yRes=2.0,
+                    yRes=-2.0,
                     resampleAlg='average',
                     dstSRS='EPSG:3031',
-                    outputBounds=dem_ds.GetGeoTransform(),  # use bounds of DEM (we refine this below)
+                    outputBounds=(x_min, y_min, x_max, y_max),
                     dstNodata=-np.nan,
                     outputType=gdal.GDT_Float32,
                     creationOptions=["TILED=YES", "COMPRESS=LZW"],
                     warpOptions=["INIT_DEST=NO_DATA"],
                     multithread=True,
-                    options=["-tap"],  # tap: align pixels to target grid
                     targetAlignedPixels=True,
                     outputBoundsSRS='EPSG:3031',
                     srcNodata=-9999)
@@ -145,36 +157,75 @@ class DataProcessor:
             counts2mFName = getattr(self.params, '{}Penguin2m'.format(col))
             print('demFName:', demFName, 'shp name:', ptShpFName, 'count name:', counts2mFName)
 
-            # Open DEM to get georeferencing and size
+            # OPEN DEM TO GET GEOREFERENCING
             dem_ds = gdal.Open(demFName)
-            geotransform = dem_ds.GetGeoTransform()
-            projection = dem_ds.GetProjection()
-#            x_min = geotransform[0]
-#            y_max = geotransform[3]
-            x_res = dem_ds.RasterXSize
-            y_res = dem_ds.RasterYSize
+            dem_band = dem_ds.GetRasterBand(1)
+            dem_array = dem_band.ReadAsArray()
+            dem_nodata = dem_band.GetNoDataValue()
+            gt = dem_ds.GetGeoTransform()
+            proj = dem_ds.GetProjection()
+            rows, cols = dem_array.shape
 
-            # Create in-memory target raster
-            nodata_value = 65535
-            mem_driver = gdal.GetDriverByName("MEM")
-            target_ds = mem_driver.Create("", x_res, y_res, 1, gdal.GDT_UInt16)
-            target_ds.SetGeoTransform(geotransform)
-            target_ds.SetProjection(projection)
-            band = target_ds.GetRasterBand(1)
-            band.Fill(nodata_value)
-            band.SetNoDataValue(nodata_value)
+            ## MAKE EMPTY ARRAY TO POPULATE
+            count_array = np.zeros((rows, cols), dtype=np.uint16)
 
-            # Rasterize using point count per pixel
+            ## OPEN POINT SHAPEFILE
             shp_ds = ogr.Open(ptShpFName)
             layer = shp_ds.GetLayer()
-            gdal.RasterizeLayer(target_ds, [1],
-                                layer,
-                                burn_values=[1],
-                                options=["ALL_TOUCHED=TRUE"],  
-                                mergeAlg=gdal.GRA_Add)  # Count all overlapping points
-            # Save to disk
-            gtiff_driver = gdal.GetDriverByName("GTiff")
-            gtiff_driver.CreateCopy(counts2mFName, target_ds)
+            ## TRANSFORM CRS TO EPSG:3031
+            source_srs = layer.GetSpatialRef()
+            target_srs = osr.SpatialReference()
+            target_srs.ImportFromEPSG(3031)  # Your DEM is in EPSG:3031
+            coord_transform = osr.CoordinateTransformation(source_srs, target_srs)
+
+            ## GET X Y DATA OF PENGUIN LOCATIONS.
+            x_list, y_list = [], []
+            for feat in layer:
+                geom = feat.GetGeometryRef()
+                geom.Transform(coord_transform)
+                x, y = geom.GetX(), geom.GetY()
+                x_list.append(x)
+                y_list.append(y)
+            x_coords = np.array(x_list)
+            y_coords = np.array(y_list)
+            ## POPULATE EMPTY 2D ARRAY
+            addCountsToCells(x_coords, y_coords, gt, count_array)
+
+            ## SHOULD MATCH NUMBER OF FEATURES IN SHAPEFILE
+            print(col, "Penguin count total:", np.sum(count_array))
+            print(col, "Nonzero pixels:", np.count_nonzero(count_array))
+
+            ## SAVE GeoTIFF
+            driver = gdal.GetDriverByName('GTiff')
+            out_ds = driver.Create(counts2mFName, cols, rows, 1, gdal.GDT_UInt16)
+            out_ds.SetGeoTransform(gt)
+            out_ds.SetProjection(proj)
+            out_band = out_ds.GetRasterBand(1)
+            nodata_val = 65535
+            if dem_nodata is not None:
+                count_array[dem_array == dem_nodata] = nodata_val
+            out_band.WriteArray(count_array)
+            out_band.SetNoDataValue(nodata_val)
+
+            out_ds.FlushCache()
+            out_ds = None
+
+@njit
+def addCountsToCells(x_coords, y_coords, gt, out_array):
+    """
+    ## NUMBA FUNCTION TO POPULATE COUNTS INTO EMPTY ARRAY
+    """
+    for i in range(len(x_coords)):
+        x = x_coords[i]
+        y = y_coords[i]
+        col = int((x - gt[0]) / gt[1])
+#        row = int((y - gt[3]) / gt[5])  # gt[5] is negative for north-up
+        row = int((gt[3] - y) / abs(gt[5]))  
+
+        if 0 <= row < out_array.shape[0] and 0 <= col < out_array.shape[1]:
+            out_array[row, col] += 1
+
+
 
 
 def main():
