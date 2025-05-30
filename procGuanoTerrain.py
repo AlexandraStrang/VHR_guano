@@ -82,7 +82,7 @@ class DataProcessor:
 
         #############################
         ## RUN FUNCTIONS
-#        self.WarpRasters()
+        self.WarpRasters()
         self.makePenguinCountRaster()
 
         ## END RUNNING 
@@ -152,10 +152,9 @@ class DataProcessor:
         for col in self.params.colonies:    
             ## GET DATA NAMES AND PATHS
             demFName = getattr(self.params, '{}DEMFName'.format(col))
-            print('demFName', demFName)
             ptShpFName = getattr(self.params, '{}PointsFName'.format(col))
             counts2mFName = getattr(self.params, '{}Penguin2m'.format(col))
-            print('demFName:', demFName, 'shp name:', ptShpFName, 'count name:', counts2mFName)
+            print('shp name:', ptShpFName, 'count name:', counts2mFName)
 
             # OPEN DEM TO GET GEOREFERENCING
             dem_ds = gdal.Open(demFName)
