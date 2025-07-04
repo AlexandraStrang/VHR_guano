@@ -1,11 +1,10 @@
 # Python script for turning penguin points into XY data (EPSG:3031)
-# Copyright (C) 2025 Alexandra Strang and Dean Anderson 
+# Copyright (C) 2025 Alexandra Strang and Dean Anderson
 # NOT DONE JUST TESTING
 
 import os
-import numpy as np
-from numba import njit
-from osgeo import gdal, ogr, osr
+import pandas as pd
+from osgeo import ogr, osr
 
 
 class Params:
@@ -23,7 +22,7 @@ class Params:
         # OUTPUT DATA FILENAME
         self.RoydsPointsCSV = os.path.join(self.DataPath, 'Royds_Points_3031.csv')
 
-        self.colonies = ['Crozier', 'Royds']
+        self.colonies = ['Royds']
 
 
 class DataProcessor:
@@ -40,63 +39,43 @@ class DataProcessor:
         # END RUNNING
         #############################
 
+    def makePenguinPointsXY(self):
+        """
+        ## READ IN SHAPEFILE, TRANSFORM TO 3031, EXTRACT XY AND EXPORT AS CSV
+        """
+        for col in self.params.colonies:
+            # GET DATA NAMES AND PATHS
+            demFName = getattr(self.params, f'{col}DEMFName')
+            ptShpFName = getattr(self.params, f'{col}PointsFName')
+            print(f'demFName: {demFName}, shp name: {ptShpFName}')
 
-def makePenguinPointsXY(self):
-    """
-    ## READ IN SHAPEFILE, ADD XY AND EXPORT AS CSV
-    """
-    for col in self.params.colonies:    
-        # GET DATA NAMES AND PATHS
-        demFName = getattr(self.params, '{}DEMFName'.format(col))
-        ptShpFName = getattr(self.params, '{}PointsFName'.format(col))
-        print('demFName:', demFName, 'shp name:', ptShpFName)
+            # OPEN POINT SHAPEFILE
+            shp_ds = ogr.Open(ptShpFName)
+            layer = shp_ds.GetLayer()
+            source_srs = layer.GetSpatialRef()
 
-        # OPEN DEM TO GET GEOREFERENCING
-        dem_ds = gdal.Open(demFName)
-        dem_band = dem_ds.GetRasterBand(1)
-        dem_array = dem_band.ReadAsArray()
-        dem_nodata = dem_band.GetNoDataValue()
-        gt = dem_ds.GetGeoTransform()
-        proj = dem_ds.GetProjection()
-        rows, cols = dem_array.shape
+            # TRANSFORM CRS TO EPSG:3031
+            target_srs = osr.SpatialReference()
+            target_srs.ImportFromEPSG(3031)  # Your DEM is in EPSG:3031
+            coord_transform = osr.CoordinateTransformation(source_srs, target_srs)
 
-        # MAKE EMPTY ARRAY TO POPULATE
-        XY_array = np.zeros((rows, cols), dtype=np.uint16)
+            # GET X Y DATA OF PENGUIN LOCATIONS
+            x_list, y_list = [], []
 
-        # OPEN POINT SHAPEFILE
-        shp_ds = ogr.Open(ptShpFName)
-        layer = shp_ds.GetLayer()
-        # TRANSFORM CRS TO EPSG:3031
-        source_srs = layer.GetSpatialRef()
-        target_srs = osr.SpatialReference()
-        target_srs.ImportFromEPSG(3031)  # Your DEM is in EPSG:3031
-        coord_transform = osr.CoordinateTransformation(source_srs, target_srs)
+            for feat in layer:
+                geom = feat.GetGeometryRef()
+                geom.Transform(coord_transform)
+                x, y = geom.GetX(), geom.GetY()
+                x_list.append(x)
+                y_list.append(y)
 
-        # GET X Y DATA OF PENGUIN LOCATIONS
-        x_list, y_list = [], []
-        for feat in layer:
-            geom = feat.GetGeometryRef()
-            geom.Transform(coord_transform)
-            x, y = geom.GetX(), geom.GetY()
-            x_list.append(x)
-            y_list.append(y)
-        x_coords = np.array(x_list)
-        y_coords = np.array(y_list)
-        # POPULATE EMPTY 2D ARRAY
-        addXYPoints(x_coords, y_coords, gt, XY_array)
+            # CONVERT TO DATAFRAME
+            df = pd.DataFrame({"x": x_list, "y": y_list})
 
-
-@njit
-def addXYPoints(x_coords, y_coords, gt, out_array):
-    """
-    ## NUMBA FUNCTION TO POPULATATE XY DATA INTO EMPTY ARRAY
-    """
-    for i in range(len(x_coords)):
-        x = x_coords[i]
-        y = y_coords[i]
-
-# NOT DONE
-# WRITE CSV
+            # WRITE CSV
+            csv_path = os.path.join(self.params.DataPath, f'{col}_Points_3031.csv')
+            df.to_csv(csv_path, index=False)
+            print(f'Saved: {csv_path}')
 
 
 def main():
