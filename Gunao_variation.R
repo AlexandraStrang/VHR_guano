@@ -1,4 +1,4 @@
-# r script for exploratory analysis of within seasonal guano stain variation
+# r script for analysis of within seasonal guano stain variation
 # creator: Alexandra Strang
 # created: 2025
 
@@ -607,6 +607,8 @@ summary(null_model)
 anova(null_model)
 null_AIC <- AIC(null_model)
 null_AICc <- AICc(null_model)
+
+anova(null_model, log_reduced4_lmm)
 # null model better?
 
 # model selection using mumin (without null)
@@ -638,8 +640,6 @@ akaike.weights(x)
 x <- c(null_AICc, M1_AICc, M2_AICc, M4_AICc)
 akaike.weights(x)
 # same story
-
-# stepAIC?
 
 # variation in guano area is more influential then a change in size
 
@@ -703,7 +703,46 @@ acf(resid(AR1_lmm))
 # no autocorrelation
 
 anova(log_reduced4_lmm, AR1_lmm)
-# check which one is better
+# model without autoregressive structure is better 
+# no evidence that adding the AR(1) structure improves model fit
+
+##########################################################################
+# ANOVA test for February effect
+##########################################################################
+
+# subset within season data into estimates before and after 59 days since December 1st
+# 59 days since December 1st represents late January
+# the last two estimates for each colony are "Feb" and rest are "Pre_Feb"
+
+# Subset the data into Pre_Feb and Feb
+Dataset.1.4$Feb_effect <- ifelse(Dataset.1.4$Day_D1 < 59, "Pre_Feb", "Feb")
+Dataset.1.4$Feb_effect <- as.factor(Dataset.1.4$Feb_effect)
+
+View(Dataset.1.4)
+
+# ANOVA that tests whether guano area estimates differ between Pre_Feb and Feb
+# also accounts for differences in colony size and the feb effect dependent on colony
+anova_model <- aov(Log_GA ~ Feb_effect * Colony_code, data = Dataset.1.4)
+summary(anova_model)
+# used log guano
+# significantly different between Pre_Feb and Feb, where the effect depends on colony
+
+# test February effect accounting for colony differences with random effect
+
+# Feb effect model
+Feb_model <- lme(
+  fixed = Log_GA ~ Feb_effect,
+  random = ~ 1 | Colony_code,
+  data = Dataset.1.4
+)
+summary(Feb_model)
+anova(Feb_model)
+Feb_AIC <- AIC(Feb_model)
+Feb_AICc <- AICc(Feb_model)
+
+anova(null_model, Feb_model)
+# Feb effect model is better
+# Suggests that the last two data points are higher than the rest
 
 ##########################################################################
 # GA and BP relationship
