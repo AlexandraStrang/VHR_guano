@@ -6,8 +6,10 @@ library(sf)
 library(fmesher)
 library(ggplot2)
 library(INLA)
+library(ggpubr)
 
 # EPSG 3031 is in metres but geom_sf will convert to degrees
+# mesh previews = meshbuilder()
 
 # Cape Royds 2020
 # read in points from xy csv
@@ -61,8 +63,9 @@ sf_Royds_guano <- st_transform(sf_Royds_guano, crs = st_crs(sf_Royds))
 Royds_mesh2 <- mesh2 <- fm_mesh_2d(boundary = sf_Royds_guano,
                                    max.edge = max.edge, 
                                    crs = st_crs(sf_Royds))
+
 # just plot GA boundary mesh
-ggplot() +
+mesh2_plot_Royds <- ggplot() +
   geom_fm(data = Royds_mesh2) +
   geom_sf(data = sf_Royds_guano, fill = NA, color = "blue", linetype = "dashed") +
   labs(
@@ -72,18 +75,20 @@ ggplot() +
   theme_minimal()
 # geom_sf converts to degrees
 
+mesh2_plot_Royds
+
 # expand inner layer same amount as max.edge
 bound.outer = diff(range(st_coordinates(sf_Royds)[,2]))/3
 
 Royds_mesh3 <- fm_mesh_2d(boundary = sf_Royds_guano,
                     max.edge = c(1,2)*max.edge, # inner and outer max edge where outer layer has triangle density two times lower than inner
-                    offset=c(max.edge, bound.outer),
+                    offset = c(max.edge, bound.outer),
                     cutoff = max.edge/5, # cutoff 1/5 of max.edge
                     crs = st_crs(sf_Royds))
 # very coarse mesh, encompasses points, not within GA boundary
 
 # just plot GA boundary mesh
-ggplot() +
+mesh3_plot_Royds <- ggplot() +
   geom_fm(data = Royds_mesh3) +
   geom_sf(data = sf_Royds_guano, fill = NA, color = "blue", linetype = "dashed") +
   labs(
@@ -92,10 +97,12 @@ ggplot() +
   ) +
   theme_minimal()
 # geom_sf converts to degrees
+
+mesh3_plot_Royds
 # inner does not look finer than outer
 
 # plot GA boundary mesh with points
-ggplot() + 
+mesh3.5_plot_Royds <- ggplot() + 
   geom_fm(data = Royds_mesh3) + 
   geom_sf(data = sf_Royds_guano, fill = NA, color = "blue", linetype = "dashed") + 
   geom_sf(data = sf_Royds, color = "purple", size = 1.7, alpha = 0.5) + 
@@ -105,8 +112,18 @@ ggplot() +
     ) + 
   theme_minimal()
 # geom_sf converts to degrees
+
+mesh3.5_plot_Royds
 # very coarse mesh beyond GA boundary
 # way more points than GA boundary
+
+# plot together
+Together <- plot(ggarrange(mesh2_plot_Royds, 
+                           mesh3_plot_Royds, 
+                           mesh3.5_plot_Royds,
+                           ncol = 3, nrow = 1, labels=c("a","b","c")))
+#annotate_figure(Together, left = "Northing", bottom = "Easting")
+
 
 # Cape Crozier 2020
 # read in points from xy csv
@@ -162,7 +179,7 @@ Crozier_mesh2 <- fm_mesh_2d(boundary = sf_Crozier_guano,
                     crs = st_crs(sf_Crozier))
 
 # just plot GA boundary mesh
-ggplot() +
+mesh2_plot_Crozier <- ggplot() +
   geom_fm(data = Crozier_mesh2) +
   geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") +
   labs(
@@ -171,6 +188,8 @@ ggplot() +
   ) +
   theme_minimal()
 # geom_sf converts to degrees
+
+mesh2_plot_Crozier
 
 # plot GA boundary mesh with points
 ggplot() +
@@ -189,13 +208,13 @@ bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/3
 
 Crozier_mesh3 <- fm_mesh_2d(boundary = sf_Crozier_guano,
                           max.edge = c(1,2)*max.edge, # inner and outer max edge where outer layer has triangle density two times lower than inner
-                          offset=c(max.edge, bound.outer),
+                          offset = c(max.edge, bound.outer), # offset wrong?
                           cutoff = max.edge/5, # cutoff 1/5 of max.edge
                           crs = st_crs(sf_Crozier))
 # very coarse mesh, encompasses points, not within GA boundary
 
 # just plot GA boundary mesh
-ggplot() +
+mesh3_plot_Crozier <- ggplot() +
   geom_fm(data = Crozier_mesh3) +
   geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") +
   labs(
@@ -204,10 +223,12 @@ ggplot() +
   ) +
   theme_minimal()
 # geom_sf converts to degrees
+
+mesh3_plot_Crozier
 # triangle density goes down
 
 # plot GA boundary mesh with points
-ggplot() + 
+mesh3.5_plot_Crozier <- ggplot() + 
   geom_fm(data = Crozier_mesh3) + 
   geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") + 
   geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
@@ -217,4 +238,100 @@ ggplot() +
   ) + 
   theme_minimal()
 # geom_sf converts to degrees
+
+mesh3.5_plot_Crozier
 # very coarse
+
+# plot together
+Together <- plot(ggarrange(mesh2_plot_Crozier, 
+                           mesh3_plot_Crozier, 
+                           mesh3.5_plot_Crozier,
+                           ncol = 3, nrow = 1, labels=c("a","b","c")))
+#annotate_figure(Together, left = "Northing", bottom = "Easting")
+
+# change max.edge
+# this is 1/15 study size using x range
+# x range is longer than y here
+max.edge <- diff(range(st_coordinates(sf_Crozier)[,1]))/(3*5)
+# 160 m
+
+# expand inner layer same amount as max.edge
+bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
+
+Crozier_mesh4 <- fm_mesh_2d(boundary = sf_Crozier_guano,
+                            max.edge = c(1,2)*max.edge, # inner and outer max edge where outer layer has triangle density much lower than inner
+                            offset = c(max.edge, bound.outer),
+                            cutoff = max.edge/5, # cutoff 1/5 of max.edge
+                            crs = st_crs(sf_Crozier))
+# finer mesh
+
+# just plot GA boundary mesh
+mesh4_plot_Crozier <- ggplot() +
+  geom_fm(data = Crozier_mesh4) +
+  geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") +
+  labs(
+    x = "Easting ()",
+    y = "Northing ()",
+  ) +
+  theme_minimal()
+# geom_sf converts to degrees
+
+mesh4_plot_Crozier
+# inner mesh too coarse?
+
+# plot GA boundary mesh with points
+mesh4.5_plot_Crozier <- ggplot() + 
+  geom_fm(data = Crozier_mesh4) + 
+  geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") + 
+  geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+  ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+mesh4.5_plot_Crozier
+
+# try finer mesh
+Crozier_mesh5 <- fm_mesh_2d(boundary = sf_Crozier_guano,
+                            loc = st_coordinates(sf_Crozier), # more inner triangles?
+                            max.edge = c(1,2)*max.edge, # inner and outer max edge where outer layer has triangle density 2 times lower than inner
+                            offset = c(max.edge, bound.outer),
+                            cutoff = 0.5, # reduce cut off?
+                            crs = st_crs(sf_Crozier))
+
+# just plot GA boundary mesh
+mesh5_plot_Crozier <- ggplot() +
+  geom_fm(data = Crozier_mesh5) +
+  geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") +
+  labs(
+    x = "Easting ()",
+    y = "Northing ()",
+  ) +
+  theme_minimal()
+# geom_sf converts to degrees
+
+mesh5_plot_Crozier
+# inner mesh too coarse?
+
+# plot GA boundary mesh with points
+mesh5.5_plot_Crozier <- ggplot() + 
+  geom_fm(data = Crozier_mesh5) + 
+  geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") + 
+  geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+  ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+mesh5.5_plot_Crozier
+
+# plot together
+Together <- plot(ggarrange(mesh5_plot_Crozier, 
+                           mesh5.5_plot_Crozier,
+                           ncol = 2, nrow = 1, labels=c("a","b")))
+#annotate_figure(Together, left = "Northing", bottom = "Easting")
+
