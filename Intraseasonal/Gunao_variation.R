@@ -201,7 +201,6 @@ All_3_plot <- plot(ggarrange(ADAR_plot2,
 annotate_figure(All_3_plot, left = "Log guano area (m2)", bottom = "Days since December 1st")
 
 # View on the same plot
-
 All_together <- ggplot(Dataset.1.4, aes(x = Day_D1, y = Log_GA, group = Colony_code)) +
   geom_point(aes(colour = Colony_code)) +
   geom_line(aes(colour = Colony_code)) +
@@ -217,6 +216,7 @@ All_together <- ggplot(Dataset.1.4, aes(x = Day_D1, y = Log_GA, group = Colony_c
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
 All_together
+# Figure 3 of Chap 1
 
 # Differences between and within colonies (means and standard deviations)
 
@@ -234,6 +234,7 @@ Box_plot <- ggplot(Dataset.1.4, aes(x = Colony_code, y = Log_GA, fill = Colony_c
   scale_fill_manual(values = colours)
 
 Box_plot
+# Figure 4 of Chap 1
 
 # Calculate means and standard deviations for each colony
 library(dplyr)
@@ -714,7 +715,7 @@ anova(log_reduced4_lmm, AR1_lmm)
 # 59 days since December 1st represents late January
 # the last two estimates for each colony are "Feb" and rest are "Pre_Feb"
 
-# Subset the data into Pre_Feb and Feb
+# Subset the data into the first three points and the last two (Pre_Feb and Feb)
 Dataset.1.4$Feb_effect <- ifelse(Dataset.1.4$Day_D1 < 59, "Pre_Feb", "Feb")
 Dataset.1.4$Feb_effect <- as.factor(Dataset.1.4$Feb_effect)
 
@@ -745,7 +746,7 @@ anova(null_model, Feb_model)
 # Suggests that the last two data points are higher than the rest
 
 ##########################################################################
-# GA and BP relationship
+# GA and BP relationship (model created in Strang MSc thesis)
 ##########################################################################
 
 # Extract only within season data and needed variables 
@@ -828,3 +829,5 @@ View(Dataset.2.2)
 GA_date <- lm(Dataset.2.1$Log_GA ~ Dataset.2.1$Log_BP + Dataset.2.1$Day_D1)
 summary(GA_date)
 # doesn't do anything
+
+
