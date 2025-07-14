@@ -772,7 +772,9 @@ Feb_resids
 # GA and BP relationship (model created in Strang MSc thesis)
 ##########################################################################
 
-# Extract only within season data and needed variables 
+# update to include all 15 colonies
+
+# Extract only interseasonal data and needed variables 
 Dataset.2.0 <- Dataset.1.0[,c("Colony_name","GA","BP","Analysis2","Date")]
 View(Dataset.2.0)
 
@@ -795,7 +797,7 @@ GA_BP <- lm(Dataset.2.1$Log_GA ~ Dataset.2.1$Log_BP)
 summary(GA_BP)
 r2 <- round(summary(GA_BP)$r.squared, 2)
 
-colours <- c("orchid","navy", "indianred", "royalblue", "skyblue", "red", 
+colours_14 <- c("orchid","navy", "indianred", "royalblue", "skyblue", "red", 
              "pink", "orange", "gold", "slateblue", 
              "magenta", "cyan", "grey", "violetred")
 
@@ -814,9 +816,13 @@ All_plot <- ggplot(Dataset.2.1, aes(x = Log_BP, y = Log_GA, colour = Colony_name
         panel.grid.minor = element_blank(),
         panel.border = element_blank()) +
   labs(color = "Colony") +
-  scale_color_manual(values = colours)
+  scale_color_manual(values = colours_14)
 
 All_plot
+
+##########################################################################
+# Test for influence of Feb estimates on BP predictions
+##########################################################################
 
 # convert image dates to date variable in r
 Dataset.2.1$r_date <- as.character(Dataset.2.1$Date)
@@ -845,3 +851,121 @@ Dataset.2.2$Feb_effect <- as.factor(Dataset.2.2$Feb_effect)
 
 # View
 View(Dataset.2.2)
+
+# test Feb effect in GA ~ BP model
+Feb_GA_BP <- lm(Dataset.2.2$Log_GA ~ Dataset.2.2$Log_BP + Dataset.2.2$Feb_effect)
+summary(Feb_GA_BP)
+# Feb effect not significant
+
+# mixed Feb effect model
+Feb_mixed <- lme(
+  fixed = Log_GA ~ Log_BP + Feb_effect,
+  random = ~ 1 | Colony_name,
+  data = Dataset.2.2
+)
+summary(Feb_mixed)
+anova(Feb_mixed)
+# Feb effect not significant
+
+# Make BP predictions from GA~BP model (model created in Strang MSc thesis)
+
+# model: Log GA = a + b * Log BP
+# a is intercept
+# b is slope
+
+# extract model covariates 
+a <- coef(GA_BP)[1]  # intercept
+b <- coef(GA_BP)[2]  # slope
+
+# invert by:
+# Log_BP = (Log_GA - a) / b
+# BP = exp((log(GA) - a) / b)
+
+# GA estimates across Dec - Feb for Adare, Crozier, and Hallett
+
+# Extract only needed variables 
+Dataset.1.5 <- Dataset.1.4[,c("Colony_code","Season","Date","GA","Day_D1","Log_GA")]
+View(Dataset.1.5)
+
+# predict log BP from intra-seasonal GA using updated GA ~ BP model
+Dataset.1.5$Log_BP_Pred <- NA  # initialise column
+Dataset.1.5$Log_BP_Pred <- (Dataset.1.5$Log_GA - a) / b
+
+# back-transform to get estimated BP
+Dataset.1.5$BP_Pred <- exp(Dataset.1.5$Log_BP_Pred)
+
+View(Dataset.1.5)
+
+# scale to view GA and BP on same graph
+# find scale range of Log_GA
+GA_range <- range(Dataset.1.5$Log_GA, na.rm = TRUE)
+BP_range <- range(Dataset.1.5$BP_Pred, na.rm = TRUE)
+
+# rescale BP_Pred to match the Log_GA range
+Dataset.1.5$BP_Pred_scaled <- (Dataset.1.5$BP_Pred - BP_range[1]) / diff(BP_range) * diff(GA_range) + GA_range[1]
+
+# View on the same plot
+GA_BP_preds <- ggplot(Dataset.1.5, aes(x = Day_D1)) +
+  # Guano Area
+  geom_point(aes(y = Log_GA, colour = Colony_code), size = 2) +
+  geom_line(aes(y = Log_GA, colour = Colony_code), linewidth = 1) +
+  
+  # predicted BP
+  geom_point(aes(y = BP_Pred_scaled, shape = Colony_code), size = 2, alpha = 0.5) +
+  geom_line(aes(y = BP_Pred_scaled, linetype = Colony_code), alpha = 0.5, linewidth = 1) +
+  
+  # axis labels
+  xlab("Days since December 1st") +
+  scale_y_continuous(
+    name = "Log guano area (m²)",
+    sec.axis = sec_axis(
+      transform = ~ (.-GA_range[1]) * diff(BP_range)/diff(GA_range) + BP_range[1],
+      name = "Predicted breeding pairs"
+    )
+  ) +
+  scale_x_continuous(limits = c(1, 90), breaks = seq(1, 90, by = 10)) +
+  scale_color_manual(values = colours) +
+  theme_minimal() +
+  theme(
+    axis.line = element_line(colour = 'black'),
+    plot.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank()
+  )
+
+GA_BP_preds
+
+# just BP preds
+BP_preds <- ggplot(Dataset.1.5, aes(x = Day_D1, y = BP_Pred, group = Colony_code)) +
+  geom_point(aes(colour = Colony_code)) +
+  geom_line(aes(colour = Colony_code)) +
+  xlab("Days since December 1st") +
+  ylab("Predicted breeding pairs") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = 'black'),
+        plot.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank()) +
+  scale_color_manual(values = colours) +
+  scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
+
+BP_preds
+
+GA_BP_plot <- ggplot(Dataset.1.5, aes(x = Log_BP_Pred, y = Log_GA, colour = Colony_code)) + 
+  geom_point(size=3) + 
+  geom_smooth(method="lm", col = "black") +
+  xlab("Log Predicted breeding pairs") +
+  ylab("Log Guano area (m2)") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(axis.line = element_line(color='black'),
+        plot.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank()) +
+  labs(color = "Colony") +
+  scale_color_manual(values = colours)
+
+GA_BP_plot
