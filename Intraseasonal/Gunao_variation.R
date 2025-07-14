@@ -953,19 +953,6 @@ BP_preds <- ggplot(Dataset.1.5, aes(x = Day_D1, y = BP_Pred, group = Colony_code
 
 BP_preds
 
-GA_BP_plot <- ggplot(Dataset.1.5, aes(x = Log_BP_Pred, y = Log_GA, colour = Colony_code)) + 
-  geom_point(size=3) + 
-  geom_smooth(method="lm", col = "black") +
-  xlab("Log Predicted breeding pairs") +
-  ylab("Log Guano area (m2)") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.line = element_line(color='black'),
-        plot.background = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank()) +
-  labs(color = "Colony") +
-  scale_color_manual(values = colours)
+# need to determine if change in predicted BP is large enough to care?
 
-GA_BP_plot
+
