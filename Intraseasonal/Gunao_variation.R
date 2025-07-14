@@ -745,25 +745,47 @@ anova(null_model, Feb_model)
 # Feb effect model is better
 # Suggests that the last two data points are higher than the rest
 
+# Feb model resids
+qqnorm(resid(Feb_model))  # Q-Q plot for residuals
+qqline(resid(Feb_model))  # reference line
+# pattern?
+
+Dataset.1.4$fittedfeb <- fitted(Feb_model)
+Dataset.1.4$residfeb <- resid(Feb_model)
+
+Feb_resids <- ggplot(Dataset.1.4, aes(x=fittedfeb, y=residfeb, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
+  geom_point(size=3) + 
+  geom_hline(yintercept = 0) + 
+  xlab("Observed") + 
+  ylab("Residuals") + 
+  scale_shape_manual(values = c(21,21,21)) +
+  scale_fill_manual(values = colours) +
+  scale_colour_manual(values = colours) +
+  theme_classic() +
+  theme(axis.text.x = element_text(colour = 'black', size=12),
+        axis.text.y = element_text(colour = 'black', size=12),) + 
+  scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
+
+Feb_resids
+
 ##########################################################################
 # GA and BP relationship (model created in Strang MSc thesis)
 ##########################################################################
 
 # Extract only within season data and needed variables 
-Dataset.2 <- Dataset.1.0[,c("Colony_name","GA","BP","Analysis2","Date",
-                            "MEANCOLLECTEDGSD","MEANSUNAZ","MEANSUNEL","MEANOFFNADIRVIEWANGLE")]
-View(Dataset.2)
+Dataset.2.0 <- Dataset.1.0[,c("Colony_name","GA","BP","Analysis2","Date")]
+View(Dataset.2.0)
 
 # Keep only interseaonal data
 # interseasonal analysis for within season images is median estimate date
-Dataset.2$Analysis2[Dataset.2$Analysis2 == ""] <- NA
-Dataset.2$Analysis2[Dataset.2$Analysis2 == "NA"] <- NA
-sum(is.na(Dataset.2$Analysis2))
+Dataset.2.0$Analysis2[Dataset.2.0$Analysis2 == ""] <- NA
+Dataset.2.0$Analysis2[Dataset.2.0$Analysis2 == "NA"] <- NA
+sum(is.na(Dataset.2.0$Analysis2))
 
 # Condense/ remove analysis column
 
 # Remove NAs
-Dataset.2.1 <- na.omit(Dataset.2)
+Dataset.2.1 <- na.omit(Dataset.2.0)
 View(Dataset.2.1)
 
 Dataset.2.1$Log_GA <- log(Dataset.2.1$GA)
@@ -794,16 +816,7 @@ All_plot <- ggplot(Dataset.2.1, aes(x = Log_BP, y = Log_GA, colour = Colony_name
   labs(color = "Colony") +
   scale_color_manual(values = colours)
 
-All_plot # does this include all the intra-seasonal estimates?
-
-# check influence of covariates
-
-GA_base <- lm(Dataset.2.1$Log_GA ~ Dataset.2.1$Log_BP + Dataset.2.1$MEANCOLLECTEDGSD + Dataset.2.1$MEANSUNAZ + Dataset.2.1$MEANSUNEL + Dataset.2.1$MEANOFFNADIRVIEWANGLE)
-summary(GA_base)
-# none are important
-
-# try date
-# Turn image date into days since December 1st (Day_D1)
+All_plot
 
 # convert image dates to date variable in r
 Dataset.2.1$r_date <- as.character(Dataset.2.1$Date)
@@ -820,14 +833,15 @@ Dataset.2.1$Day_D1 <- as.numeric(difftime(Dataset.2.1$r_date,
 # Days since December 1st: numerical but discrete without decimals 
 
 # Condense/ remove r date column
-Dataset.2.2 <- Dataset.2.1[,c("Colony_name","Log_GA","Log_BP","Date","GA", "Day_D1",
-                              "MEANCOLLECTEDGSD","MEANSUNAZ","MEANSUNEL","MEANOFFNADIRVIEWANGLE")]
+Dataset.2.2 <- Dataset.2.1[,c("Colony_name","Log_GA","Log_BP","Date","GA", "Day_D1")]
+
+# subset data into estimates before and after 59 days since December 1st
+# 59 days since December 1st represents late January
+# estimates after 59 days are "Feb" and rest are "Pre_Feb"
+
+# Subset the data into Pre_Feb and Feb
+Dataset.2.2$Feb_effect <- ifelse(Dataset.2.2$Day_D1 < 59, "Pre_Feb", "Feb")
+Dataset.2.2$Feb_effect <- as.factor(Dataset.2.2$Feb_effect)
 
 # View
 View(Dataset.2.2)
-
-GA_date <- lm(Dataset.2.1$Log_GA ~ Dataset.2.1$Log_BP + Dataset.2.1$Day_D1)
-summary(GA_date)
-# doesn't do anything
-
-
