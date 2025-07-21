@@ -745,6 +745,10 @@ anova(null_model, Feb_model)
 # Feb effect model is better
 # Suggests that the last two data points are higher than the rest
 
+# AICc
+x <- c(Feb_AICc, null_AICc, M1_AICc, M2_AICc, M4_AICc)
+akaike.weights(x)
+
 # Feb model resids
 qqnorm(resid(Feb_model))  # Q-Q plot for residuals
 qqline(resid(Feb_model))  # reference line
