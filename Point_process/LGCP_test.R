@@ -100,6 +100,3 @@ mesh5.5_plot_Crozier <- ggplot() +
 mesh5.5_plot_Crozier
 
 # create the spatial random field
-
-
-
