@@ -690,20 +690,20 @@ null_resids <- ggplot(Dataset.1.4, aes(x=fittednull, y=residnull, colour = Colon
 null_resids
 # resids of the best model look better than the null
 
-# acf on sun el model
-AR1_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNEL,
+# acf on null model
+AR1_null <- lme(
+  fixed = Log_GA ~ 1,
   random = ~ 1 | Colony_code,
   correlation = corAR1(form = ~ Day_D1 | Colony_code),
   data = Dataset.1.4
 )
-summary(AR1_lmm) # phi 0
-anova(AR1_lmm)
+summary(AR1_null) # phi 0
+anova(AR1_null)
 
-acf(resid(AR1_lmm))
+acf(resid(AR1_null))
 # no autocorrelation
 
-anova(log_reduced4_lmm, AR1_lmm)
+anova(null_model, AR1_null)
 # model without autoregressive structure is better 
 # no evidence that adding the AR(1) structure improves model fit
 
@@ -771,6 +771,23 @@ Feb_resids <- ggplot(Dataset.1.4, aes(x=fittedfeb, y=residfeb, colour = Colony_c
   scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
 
 Feb_resids
+
+# acf on Feb model
+AR1_Feb <- lme(
+  fixed = Log_GA ~ Feb_effect,
+  random = ~ 1 | Colony_code,
+  correlation = corAR1(form = ~ Day_D1 | Colony_code),
+  data = Dataset.1.4
+)
+summary(AR1_Feb) # phi 0
+anova(AR1_Feb)
+
+acf(resid(AR1_Feb))
+# no autocorrelation
+
+anova(Feb_model, AR1_Feb)
+# model without autoregressive structure is better 
+# no evidence that adding the AR(1) structure improves model fit
 
 ##########################################################################
 # GA and BP relationship (model created in Strang MSc thesis)
@@ -956,7 +973,4 @@ BP_preds <- ggplot(Dataset.1.5, aes(x = Day_D1, y = BP_Pred, group = Colony_code
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
 BP_preds
-
 # need to determine if change in predicted BP is large enough to care?
-
-
