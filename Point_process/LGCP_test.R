@@ -45,9 +45,9 @@ Royds_bound.outer = diff(range(st_coordinates(sf_Royds)[,2]))/3
 
 # try finer mesh but coarse on the edge
 Royds_mesh3 <- fm_mesh_2d(boundary = sf_Royds_guano,
-                          max.edge = c(1,2)*Royds_max.edge, # inner and outer max edge where outer layer has triangle density two times lower than inner
+                          max.edge = c(1,5)*Royds_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
                           offset = c(Royds_max.edge, Royds_bound.outer),
-                          cutoff = Royds_max.edge/5, # cutoff 1/5 of max.edge
+                          cutoff = Royds_max.edge/10, # reduce cutoff as 1/10 of max.edge
                           crs = st_crs(sf_Royds))
 
 # plot GA boundary mesh with points
@@ -79,9 +79,9 @@ Crozier_bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
 
 # try finer mesh
 Crozier_mesh5 <- fm_mesh_2d(boundary = sf_Crozier_guano,
-                            max.edge = c(1,2)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density 2 times lower than inner
+                            max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
                             offset = c(Crozier_max.edge, Crozier_bound.outer),
-                            cutoff = 0.5, # reduced cut off?
+                            cutoff = Crozier_max.edge/10, # reduced cut off?
                             crs = st_crs(sf_Crozier))
 # takes several minutes to run
 
