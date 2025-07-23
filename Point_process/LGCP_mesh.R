@@ -11,7 +11,7 @@ library(ggpubr)
 # EPSG 3031 is in metres but geom_sf will convert to degrees
 # mesh previews = meshbuilder()
 
-# Cape Royds 2020
+# Cape Royds 2020 - can't use as guano area is too small
 # read in points from xy csv
 Royds_xy <- read.csv("Royds_Points_3031.csv")
 
