@@ -16,13 +16,13 @@ class Params:
         # DEM FILE AND POINT SHAPEFILE
         self.RoydsDEMFName = os.path.join(self.terrain_folder, 'Cape_Royds',
             'Cape_Royds_clipped.tif')
-        self.RoydsPointsFName = os.path.join(self.DataPath, '2020_UAV_points',
+        self.RoydsPointsFName = os.path.join(self.inputDataPath, '2020_UAV_points',
             'royd_masked_labels_cleaned_coords_added_2020-12-01',
             'royd_masked_labels_cleaned_coords_added_2020-12-01.shp')
         
         self.CrozierDEMFName = os.path.join(self.terrain_folder, 'Cape_Crozier',
             'Cape_Crozier_clipped.tif')
-        self.CrozierPointsFName = os.path.join(self.DataPath, '2020_UAV_points',
+        self.CrozierPointsFName = os.path.join(self.inputDataPath, '2020_UAV_points',
             'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29',
             'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29.shp')
  
