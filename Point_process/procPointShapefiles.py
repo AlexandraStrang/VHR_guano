@@ -81,7 +81,7 @@ class DataProcessor:
             df = pd.DataFrame({"x": x_list, "y": y_list})
 
             # WRITE CSV
-            csv_path = os.path.join(self.params.outputDataPath, f'{col}_Points_3031.csv')
+            csv_path = os.path.join(self.params.outputDataPath, f'{col}_Points_2020_3031.csv')
             df.to_csv(csv_path, index=False)
             print(f'Saved: {csv_path}')
 
