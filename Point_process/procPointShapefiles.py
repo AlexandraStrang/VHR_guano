@@ -9,20 +9,27 @@ from osgeo import ogr, osr
 class Params:
     def __init__(self):
         # DATA FOLDER
-        self.DataPath = r"D:\Points_test"
+        self.inputDataPath = r"/nesi/project/landcare04225/Alexandra_Data"
+        
+        self.terrain_folder = os.path.join(self.inputDataPath, 'colony_terrain_rasters')
 
         # DEM FILE AND POINT SHAPEFILE
-        # COULD HAVE IMPORTED FROM ALEXANDRA DATA
-        self.RoydsDEMFName = os.path.join(self.DataPath, 'Cape_Royds_clipped.tif')
-        self.RoydsPointsFName = os.path.join(self.DataPath, 'royd_masked_labels_cleaned_coords_added_2020-12-01.shp')
+        self.RoydsDEMFName = os.path.join(self.terrain_folder, 'Cape_Royds',
+            'Cape_Royds_clipped.tif')
+        self.RoydsPointsFName = os.path.join(self.DataPath, '2020_UAV_points',
+            'royd_masked_labels_cleaned_coords_added_2020-12-01',
+            'royd_masked_labels_cleaned_coords_added_2020-12-01.shp')
         
-        self.CrozierDEMFName = os.path.join(self.DataPath, 'Cape_Crozier_clipped.tif')
-        self.CrozierPointsFName = os.path.join(self.DataPath, 'croz_masked_labels_cleaned_coords_added_2020-11-29.shp')
+        self.CrozierDEMFName = os.path.join(self.terrain_folder, 'Cape_Crozier',
+            'Cape_Crozier_clipped.tif')
+        self.CrozierPointsFName = os.path.join(self.DataPath, '2020_UAV_points',
+            'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29',
+            'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29.shp')
  
-        # OUTPUT DATA FILENAME
-        self.RoydsPointsCSV = os.path.join(self.DataPath, 'Royds_Points_3031.csv')
-        self.CrozierPointsCSV = os.path.join(self.DataPath, 'Crozier_Points_3031.csv')
-
+        ## OUTPUT DATA PATHS AND FILENAMES
+        self.outputDataPath = os.path.join(os.getenv('ADELIEPROJDIR', default = '.'), 
+            'Alexandra_Data', 'point_process_data')
+ 
         self.colonies = ['Royds', 'Crozier']
 
 
@@ -74,7 +81,7 @@ class DataProcessor:
             df = pd.DataFrame({"x": x_list, "y": y_list})
 
             # WRITE CSV
-            csv_path = os.path.join(self.params.DataPath, f'{col}_Points_3031.csv')
+            csv_path = os.path.join(self.params.outputDataPath, f'{col}_Points_3031.csv')
             df.to_csv(csv_path, index=False)
             print(f'Saved: {csv_path}')
 

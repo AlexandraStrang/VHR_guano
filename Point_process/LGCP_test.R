@@ -39,7 +39,7 @@ Crozier_bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
 # 500 metres
 
 # create finer Crozier mesh
-Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_guano,
+Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_guano, # change to coastline
                             max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
                             offset = c(Crozier_max.edge, Crozier_bound.outer),
                             cutoff = Crozier_max.edge/10,
@@ -49,7 +49,7 @@ Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_guano,
 mesh_plot_Crozier <- ggplot() + 
   geom_fm(data = Crozier_mesh) + 
   geom_sf(data = sf_Crozier_guano, fill = NA, color = "blue", linetype = "dashed") + 
-  #geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
+  geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
   labs( 
     x = "Easting", 
     y = "Northing", 
@@ -78,7 +78,7 @@ mesh_plot_Crozier
 
 # define the SPDE prior (matern)
 matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
-                            prior.range = c(1000, 0.5), # try 100
+                            prior.range = c(1000, 0.5), # try 100 or 10m (might be like 5m?)
                             prior.sigma = c(1, 0.5))
 
 # specify a model where for 2D models geometry is on the left of ~
@@ -86,7 +86,7 @@ matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
 # define the domain of the LGCP and model components
 # (spatial SPDE effect and Intercept)
 null_cmp <- geometry ~
-  Intercept(1) + # fixed effect (add covariates by slope of rasters)
+  Intercept(1) + # fixed effect (eventually add here the covariates of slope etc. using rasters)
   mySmooth(geometry, model = matern) # random effect
 
 # formula (geometry is response = point locations)
@@ -95,7 +95,7 @@ null_cmp <- geometry ~
 # use lgcp() with 2D model components, the sf points and the sf boundary
 null_model <- lgcp(null_cmp, # formula
                    data = sf_Crozier, # locations
-                   samplers = sf_Crozier_guano, # samplers
+                   samplers = sf_Crozier_guano, # samplers, change to UAV image bounds
                    domain = list(geometry = Crozier_mesh), # mesh
                    options = ) # no control fix
 # took several hours to run (could indicate bad model)
