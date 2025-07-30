@@ -10,6 +10,8 @@ import numpy as np
 
 # *pre-process rasters before to set minimum subcolony size?*
 
+# use PGC_test env
+
 # directories and paths
 cleaned_rasters = r"D:\Guano_rasters\Clean_guano_rasters"
 terrain_files = r'D:\Terrain\Terrain_files'  # in seperate folders by colony name
