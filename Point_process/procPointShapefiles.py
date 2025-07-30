@@ -5,6 +5,7 @@ import os
 import pandas as pd
 from osgeo import ogr, osr
 
+# use PPP_conda_env in NeSI
 
 class Params:
     def __init__(self):
