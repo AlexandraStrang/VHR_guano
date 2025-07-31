@@ -8,6 +8,7 @@ from geocube.vector import vectorize
 import os
 
 # use conda env proc_env
+# split into three parts: resample, reclassify, vectorise
 
 
 class Params:
