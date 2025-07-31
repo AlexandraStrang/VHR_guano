@@ -27,7 +27,7 @@ class Params:
             'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29',
             'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29.shp')
  
-        ## OUTPUT DATA PATHS AND FILENAMES
+        # OUTPUT DATA PATHS AND FILENAMES
         self.outputDataPath = os.path.join(os.getenv('ADELIEPROJDIR', default = '.'), 
             'Alexandra_Data', 'point_process_data')
  
