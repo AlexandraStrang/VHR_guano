@@ -15,8 +15,11 @@ library(inlabru) # for lgcp()
 # EPSG 3031 is in metres but when plotting geom_sf will convert to degrees
 
 # Construct file path
-path <- file.path("home", "user", "documents", "file.txt")
+path <- file.path("nesi", "project", "landcare04225", "Alexandra_Data", "point_process_data")
 print(path)
+
+# set working dir
+setwd(path)
 
 # read in points from xy csv
 # Cape Crozier 2020
@@ -26,25 +29,33 @@ Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
 sf_Crozier <- st_as_sf(Crozier_xy, coords = c("x", "y"), crs = 3031)
 st_crs(sf_Crozier)
 
-# import guano area shapefiles
-sf_Crozier_guano <- st_read("Point_process_GA_boundaries/Crozier_2020_1_3031_guano.shp")
+# import guano area shapefile (not needed until modelling spatial covariates)
+sf_Crozier_guano <- st_read("Crozier/Crozier_2020_GA/Crozier_2020_1_3031_guano.shp")
 # ensure shapefile has right crs code
 sf_Crozier_guano <- st_transform(sf_Crozier_guano, crs = st_crs(sf_Crozier))
 
 # import Crozier coastline boundary
-sf_Crozier_boundary <- st_read("Crozier_boundary.shp")
+sf_Crozier_boundary <- st_read("Crozier/Crozier_boundary_coastline/Crozier_boundary.shp")
 # transform shapefile so it has the right crs code
 sf_Crozier_boundary <- st_transform(sf_Crozier_boundary, crs = st_crs(sf_Crozier))
 st_crs(sf_Crozier_boundary)
+
+# import Crozier UAV bounds shapefile
+sf_Crozier_UAV_area <- st_read("Crozier/Crozier_2020_UAV_area/Crozier_20201129_3031_UAV_area.shp")
+# ensure shapefile has right crs code
+sf_Crozier_UAV_area <- st_transform(sf_Crozier_UAV_area, crs = st_crs(sf_Crozier))
+st_crs(sf_Crozier_UAV_area)
 
 # mesh parameters
 # this is 1/15 study size using x range
 # x range is longer than y here
 Crozier_max.edge <- diff(range(st_coordinates(sf_Crozier)[,1]))/(3*5)
+print("Printing Crozier max.edge:" Crozier_max.edge)
 # ~150 metres
 
 # expand outer layer out by 1/5
 Crozier_bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
+print("Printing Crozier bound.outer:" Crozier_bound.outer)
 # ~500 metres
 
 # create finer Crozier mesh
@@ -140,12 +151,13 @@ null_cmp <- geometry ~
 # use lgcp() with 2D model components, the sf points and the sf boundary
 null_model <- lgcp(null_cmp, # formula
                    data = sf_Crozier, # locations
-                   samplers = sf_Crozier_guano, # samplers, change to UAV image bounds
+                   samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
                    domain = list(geometry = Crozier_mesh), # mesh
                    options = ) # no control fix
 # took several hours to run (could indicate bad model)
 
 summary(null_model)
+# mean should be desnity per m 2
 
 # predicting intensity
 # predict the spatial intensity surface
@@ -155,16 +167,7 @@ lambda <- predict(
   ~ exp(mySmooth + Intercept) # to unlog, mySmooth is field
 )
 
-sum(lambda$mean) # wayy to big
-
-# #pred <- predict(
-#   null_model,
-#   fm_pixels(Crozier_mesh, format = "sf", mask = sf_Crozier_guano),
-#   ~ data.frame(
-#     lamda = exp(mySmooth + Intercept),
-#     loglambda = mySmooth + Intercept
-#   )
-# )
+sum(lambda$mean) # check how big
 
 # can plot log and and log lambda intensity
 
