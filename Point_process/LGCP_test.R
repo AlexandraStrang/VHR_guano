@@ -14,13 +14,6 @@ library(inlabru) # for lgcp()
 
 # EPSG 3031 is in metres but when plotting geom_sf will convert to degrees
 
-# Construct file path
-#path <- file.path("nesi", "project", "landcare04225", "Alexandra_Data", "point_process_data")
-#print(path)
-
-# set working dir
-#setwd(path)
-
 # read in points from xy csv
 # Cape Crozier 2020
 Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
@@ -124,20 +117,16 @@ Together <- plot(ggarrange(mesh_plot_Crozier,
 # create the spatial random field
 # fit an LGCP model to the locations of the penguin nests
 
-# start with prior for spatial range using half the study area
-# [,1] for x range
-# 0.5*(diff(range(st_coordinates(sf_Crozier)[,1])))
-# 1255.526 metres
-
 # the probability of the range exceeding that to be 0.5
 # the prior for the variance explained by the spatial effect
 # is set that the probability that the SD exceeds 1 is 0.5
 
 # define the SPDE prior (matern)
 matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
-                              prior.range = c(100, 0.5), # distance decay between ... metres
+                              prior.range = c(250, 0.5), # changed distance decay in metres after running model (100 looked okay but doesn't match model results)
                               prior.sigma = c(1, 0.5)) # amount of spatial variation
 
+# formula specification of model components
 # specify a model where for 2D models geometry is on the left of ~
 # and an SPDE + Intercept(1) on the right
 # define the domain of the LGCP and model components
@@ -147,7 +136,7 @@ null_cmp <- geometry ~
   mySmooth(geometry, model = matern) # random effect
 
 # formula (geometry is response = point locations)
-# mysmooth spatial autocorrelation
+# mysmooth for spatial autocorrelation
 
 # use lgcp() with 2D model components, the sf points and the sf boundary
 null_model <- lgcp(null_cmp, # formula
@@ -155,22 +144,30 @@ null_model <- lgcp(null_cmp, # formula
                     samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
                     domain = list(geometry = Crozier_mesh), # mesh
                     options = ) # no control fix
-# takes less than ~5 mins to run
+# takes less than ~2 mins to run
 
 summary(null_model)
-# mean should be desnity per m 2 (once unlogged)
+# mean should be density per m 2 (once unlogged)
 
 # predicting intensity
 # predict the spatial intensity surface
 lambda <- predict(
    null_model,
    fm_pixels(Crozier_mesh, format = "sf", mask = sf_Crozier_UAV_area), # use samplers
-   ~ exp(mySmooth + Intercept) # to unlog, mySmooth is field
+   ~ exp(mySmooth + Intercept) # exp to unlog, mySmooth is field
  )
 
 sum(lambda$mean)
-# [1] 1259.844
+# [1] 1259.388
 # under predicting based on UAV counts of over 200,000? but will change with covariates?
 
-# can plot log and and log lambda intensity
+# plot log intensity
+Intensity_plot <- ggplot() +
+  geom_fm(data = Crozier_mesh) +
+  gg(lambda, geom = "tile")
+
+Intensity_plot
+# intensity is highest at 0.5 ish (seems right for density)
+
+# make r markdown with these results
 
