@@ -2,6 +2,10 @@
 # creator: Alexandra Strang
 # created: 2025
 
+# set working directory
+setwd("D:/Points_test")
+
+# load packages 
 library(sf)
 library(fmesher)
 library(ggplot2)
@@ -51,7 +55,7 @@ Crozier_bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
 print(Crozier_bound.outer)
 # ~500 metres
 
-# create finer Crozier mesh
+# create Crozier mesh
 Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as boundary
                             max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
                             offset = c(Crozier_max.edge, Crozier_bound.outer),
@@ -124,7 +128,7 @@ Together <- plot(ggarrange(mesh_plot_Crozier,
 # define the SPDE prior (matern)
 matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
                               prior.range = c(250, 0.5), # changed distance decay in metres after running model (100 looked okay but doesn't match model results)
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
+                              prior.sigma = c(0.5, 0.1)) # amount of spatial variation
 
 # formula specification of model components
 # specify a model where for 2D models geometry is on the left of ~
@@ -158,8 +162,8 @@ lambda <- predict(
  )
 
 sum(lambda$mean)
-# [1] 1259.388
-# under predicting based on UAV counts of over 200,000? but will change with covariates?
+# 1259
+# under predicting based on UAV counts of over 200,000? 
 
 # plot log intensity
 Intensity_plot <- ggplot() +
@@ -168,6 +172,56 @@ Intensity_plot <- ggplot() +
 
 Intensity_plot
 # intensity is highest at 0.5 ish (seems right for density)
+
+# Subdivide mesh
+# makes a finer mesh to improve predictions
+# splits triangles of a mesh into subtriangles
+mesh_sub <- fm_subdivide(Crozier_mesh,3) # 6 or 3?
+
+# plot sub mesh with boundary
+sub_mesh_plot <- ggplot() + 
+  geom_fm(data = mesh_sub) + 
+  geom_sf(data = sf_Crozier_boundary, fill = NA, color = "blue", linetype = "dashed") + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+  ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+sub_mesh_plot # super fine scale
+
+# run model with mesh sub instead
+matern <- inla.spde2.pcmatern(mesh = mesh_sub,
+                              prior.range = c(250, 0.5), # changed distance decay in metres after running model
+                              prior.sigma = c(0.5, 0.1)) # amount of spatial variation
+null_cmp <- geometry ~
+  Intercept(1) + # fixed effect (eventually add here the covariates of slope etc. using rasters)
+  mySmooth(geometry, model = matern) # random effect
+
+null_model_sub <- lgcp(null_cmp, # formula
+                   data = sf_Crozier, # locations
+                   samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
+                   domain = list(geometry = mesh_sub), # mesh sub
+                   options = list(
+                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
+                   )
+)
+
+summary(null_model_sub)
+
+# make predictions from finer mesh
+# predicting intensity
+# predict the spatial intensity surface
+lambda_sub <- predict(
+  null_model_sub,
+  fm_pixels(mesh_sub, format = "sf", mask = sf_Crozier_UAV_area), # use samplers
+  ~ exp(mySmooth + Intercept) # exp to unlog, mySmooth is field
+)
+
+sum(lambda_sub$mean)
+# [1] 1360.794
+
 
 # make r markdown with these results
 
