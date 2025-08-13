@@ -16,7 +16,7 @@ This document outlines the analysis part of "Intra-seasonal variation and factor
 
 All data scripts can be found at {INSERT GITHUB LINK to VHR_guano repo}
 
-```{r packages}
+```{r packages, results='hide'}
 
 # load packages
 library(ggplot2)
@@ -27,7 +27,6 @@ library(car) # for VIF values
 library(performance) # can't use vif for lmm
 library(nlme) # Use REML for low sample sizes
 library(MuMIn) # for AICc scores
-#library(qpcR) # package masks MuMin CHANGE
 
 ```
 
@@ -51,7 +50,7 @@ To test whether estimates of the guano stain differ in size within a breeding se
 
 We looked at change in guano area over time and the influence of satellite-related variables. To explore the change in guano area over time within a breeding season we used the number of days since December 1st (ranging from 0 - 90 days) as the VHR imagery was taken between December and February. We explored the influence of factors related to how the satellite imagery was taken by extracting these variables from the imagery metadata. These satellite-related variables included the average sun elevation angle and sun azimuth, ground resolution, and off-nadir angle.
 
-```{r clean-organsise-data}
+```{r clean-organsise-data, results='hide'}
 # Create dataset with only within season data and covariates
 
 # Extract only within season data and needed variables 
@@ -121,8 +120,6 @@ ADAR_plot <- ggplot(ADARdf, aes(x = Day_D1, y = GA)) +
         panel.border = element_blank()) +
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
-ADAR_plot
-
 # Crozier
 CROZ_plot <- ggplot(CROZdf, aes(x = Day_D1, y = GA)) +
   geom_point(colour = "darkblue") +
@@ -137,8 +134,6 @@ CROZ_plot <- ggplot(CROZdf, aes(x = Day_D1, y = GA)) +
         panel.border = element_blank()) +
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
-CROZ_plot
-
 # Hallett
 HALL_plot <- ggplot(HALLdf, aes(x = Day_D1, y = GA)) +
   geom_point(colour = "skyblue") +
@@ -152,8 +147,6 @@ HALL_plot <- ggplot(HALLdf, aes(x = Day_D1, y = GA)) +
         panel.grid.minor = element_blank(),
         panel.border = element_blank()) +
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
-
-HALL_plot
 
 # Plot together
 All_3_plot <- plot(ggarrange(ADAR_plot,
@@ -191,8 +184,6 @@ ADAR_plot2 <- ggplot(ADARdf2, aes(x = Day_D1, y = Log_GA)) +
         panel.border = element_blank()) +
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
-ADAR_plot2
-
 # Crozier
 CROZ_plot2 <- ggplot(CROZdf2, aes(x = Day_D1, y = Log_GA)) +
   geom_point(colour = "darkblue") +
@@ -206,8 +197,6 @@ CROZ_plot2 <- ggplot(CROZdf2, aes(x = Day_D1, y = Log_GA)) +
         panel.grid.minor = element_blank(),
         panel.border = element_blank()) +
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
-
-CROZ_plot2
 
 # Hallett
 HALL_plot2 <- ggplot(HALLdf2, aes(x = Day_D1, y = Log_GA)) +
@@ -223,7 +212,6 @@ HALL_plot2 <- ggplot(HALLdf2, aes(x = Day_D1, y = Log_GA)) +
         panel.border = element_blank()) +
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
-HALL_plot2
 
 # Plot together
 All_3_plot <- plot(ggarrange(ADAR_plot2,
@@ -275,7 +263,7 @@ Box_plot
 
 ### 4.3 Table of guano area estimates
 
-```{r table-guano-area, echo=FALSE, message=FALSE}
+```{r table-guano-area, message=FALSE}
 
 # Calculate means and standard deviations for each colony
 
@@ -300,7 +288,7 @@ plot(table_plot)
 ## 5.0 Satellite-related covariates
 
 ### 5.1 Checking for multi-colinearity
-```{r covariates}
+```{r covariates, fig.show='hide'}
 
 # Test for multi-colinearity between covariates
 
@@ -312,7 +300,6 @@ cor.matrix <- cor(covariates) # default method is pearsons
 head(cor.matrix)
 
 corrplot(cor.matrix, method = "number", type = "lower", tl.cex = 1)
-# plot
 
 # correlated variables of greater than +/- 0.50
 # sun elevation and days since December first correlated - expected
@@ -326,9 +313,7 @@ corrplot(cor.matrix, method = "number", type = "lower", tl.cex = 1)
 # Build base model with satellite-related factors
 
 # non-log base model without random effect of colony
-base_model <- lm(Dataset.1.4$GA ~ Dataset.1.4$Day_D1 + Dataset.1.4$MEANCOLLECTEDGSD + 
-                   Dataset.1.4$MEANSUNAZ + Dataset.1.4$MEANSUNEL +
-                   Dataset.1.4$MEANOFFNADIRVIEWANGLE)
+base_model <- lm(Dataset.1.4$GA ~ Dataset.1.4$Day_D1 + Dataset.1.4$MEANCOLLECTEDGSD + Dataset.1.4$MEANSUNAZ + Dataset.1.4$MEANSUNEL + Dataset.1.4$MEANOFFNADIRVIEWANGLE)
 # too many parameters for observations
 summary(base_model)
 vif(base_model) # based on vif remove sun elevation?
@@ -788,8 +773,6 @@ We further investigated seasonal change by separating estimates of guano area in
 # Subset the data into the first three points and the last two (Pre_Feb and Feb)
 Dataset.1.4$Feb_effect <- ifelse(Dataset.1.4$Day_D1 < 59, "Pre_Feb", "Feb")
 Dataset.1.4$Feb_effect <- as.factor(Dataset.1.4$Feb_effect)
-
-head(Dataset.1.4)
 
 # ANOVA that tests whether guano area estimates differ between Pre_Feb and Feb
 # also accounts for differences in colony size and the feb effect dependent on colony
