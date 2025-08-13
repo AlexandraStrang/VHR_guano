@@ -119,7 +119,6 @@ HALL_plot
 
 library(ggpubr)
 
-# Combine
 All_3_plot <- plot(ggarrange(ADAR_plot,
                               CROZ_plot,
                               HALL_plot,
@@ -189,8 +188,6 @@ HALL_plot2 <- ggplot(HALLdf2, aes(x = Day_D1, y = Log_GA)) +
 HALL_plot2
 
 # Plot together
-
-# Combine
 All_3_plot <- plot(ggarrange(ADAR_plot2,
                              CROZ_plot2,
                              HALL_plot2,
@@ -239,7 +236,7 @@ Box_plot
 # Calculate means and standard deviations for each colony
 library(dplyr)
 
-# Table
+# Create table
 summary_table <- Dataset.1.4 %>%
   group_by(Colony_code, Season) %>%
   summarise(n = n(),
@@ -359,7 +356,9 @@ log_base_lmm <- lme(
 )
 summary(log_base_lmm) #check other correlations
 anova(log_base_lmm)
-vif(log_base_lmm)
+
+library(performance) # can't use vif for lmm
+check_collinearity(log_base_lmm)
 # remove Days since December 1st (correlated with sun el)
 # days since December first may be significant
 # colonies of different sizes are significantly different
@@ -631,16 +630,32 @@ summary(avg_model)
 # do i need to exlcude day d1?
 
 # calculate delta AICc scores and weights
-library(qpcR) # package masks MuMin 
 
 # for candidate models within delta 2 AIC
-x <- c(null_AIC, M1_AIC, M2_AIC, M4_AIC)
-akaike.weights(x)
+x <- c(null_AIC, M4_AIC, M1_AIC, M2_AIC)
 
 # AICc
-x <- c(null_AICc, M1_AICc, M2_AICc, M4_AICc)
-akaike.weights(x)
-# same story
+x <- c(null_AICc, M4_AICc, M1_AICc, M2_AICc)
+
+# compute delta AICc
+delta <- x - min(x)
+
+# compute relative likelihoods
+rel.lik <- exp(-0.5 * delta)
+rel.lik
+
+model_names <- c("Null (random intercpets) model", "Sun elevation angle", "Off-nadir angle", "Ground resolution")
+
+AICc_table <- data.frame(
+  Model = model_names,
+  AICc = x,
+  Delta_AICc = delta,
+  Akaike_Weight = Weights(x),
+  Relative_Likelihood = rel.lik
+)
+
+AICc_table[, 2:3] <- round(AICc_table[, 2:3], 3)
+print(AICc_table)
 
 # variation in guano area is more influential then a change in size
 
@@ -746,8 +761,28 @@ anova(null_model, Feb_model)
 # Suggests that the last two data points are higher than the rest
 
 # AICc
-x <- c(Feb_AICc, null_AICc, M1_AICc, M2_AICc, M4_AICc)
-akaike.weights(x)
+x <- c(Feb_AICc, null_AICc, M4_AICc, M1_AICc, M2_AICc)
+Weights(x)
+
+# compute delta AICc
+delta <- x - min(x)
+
+# compute relative likelihoods
+rel.lik <- exp(-0.5 * delta)
+rel.lik
+
+model_names <- c("February effect", "Null (random intercpets) model", "Sun elevation angle", "Off-nadir angle", "Ground resolution")
+
+AICc_table <- data.frame(
+  Model = model_names,
+  AICc = x,
+  Delta_AICc = delta,
+  Akaike_Weight = Weights(x),
+  Relative_Likelihood = rel.lik
+)
+
+AICc_table[, 2:5] <- round(AICc_table[, 2:5], 2)
+print(AICc_table)
 
 # Feb model resids
 qqnorm(resid(Feb_model))  # Q-Q plot for residuals
