@@ -1,3 +1,4 @@
 # ignore all RHistory and RData files
 *.RHistory
 *.RData
+Intraseasonal/Intraseasonal_analysis.pdf
