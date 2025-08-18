@@ -1,0 +1,289 @@
+---
+title: "Log Gaussian Cox Process (LGCP) analysis"
+author: "Alexandra Strang"
+date: "`r Sys.Date()`"
+output: pdf_document
+toc: true 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1.0 Document set up
+
+This document outlines the analysis part of "Intra-seasonal variation and factors influencing satellite-derived population indices of Ad\'{e}lie penguins (*Pygoscelis adeliae*) in the Ross Sea", the first data chapter of Alexandra Strang's doctoral thesis. This document focuses on the second question of this chapter: What factors influence the ability to use guano area extracted from VHR imagery to estimate the number of breeding pairs (i.e., nest density, terrain slope, terrain roughness, etc.)? We hypothesised that the inclusion of fine-scale terrain characteristics (i.e., terrain slope and roughness) and nesting densities will improve predictions of the number of breeding pairs from VHR-derived guano area. We aimed to develop a point process model (a Log Gaussian Cox Process (LGCP) model) to relate the location of breeding pairs from drone imagery surveys to guano areas derived from VHR imagery and fine-scale terrain characteristics. Then, theoretically, we could apply our model to a new site where drone surveys have not been done but terrain variables and guano areas have been estimated and predict the number of breeding pairs. 
+
+```{r packages, results='hide'}
+
+# load packages
+library(sf)
+library(fmesher)
+library(ggplot2)
+library(INLA)
+library(ggpubr)
+library(inlabru) # for lgcp()
+
+# sessionInfo() - important to note r version and versions of inlabru, INLA, fmesher
+# R version 4.5.0 (2025-04-11 ucrt)
+
+```
+
+## 2.0 Import data
+
+### 2.1 Penguin nest locations (points)
+
+We use the observed number of breeding pairs obtained by drone survey for Cape Crozier Ad\'{e}lie penguin colony in 2020 (2020-11-29) as our point locations. 
+
+```{r penguin-points}
+
+# set working directory
+setwd("D:/Points_test")
+
+# read in points from xy csv
+# Cape Crozier 2020
+Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
+
+# convert to sf object and check CRS
+sf_Crozier <- st_as_sf(Crozier_xy, coords = c("x", "y"), crs = 3031)
+st_crs(sf_Crozier)
+
+# EPSG 3031 is in metres but when plotting geom_sf will convert to degrees
+
+# plot points
+point_plot_Crozier <- ggplot() + 
+  geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+    ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+point_plot_Crozier
+
+# eventually use Cape Crozier 2019 GA and points
+# for model training as it has better precison and
+# foercasts rather than hindcasts
+
+```
+
+### 2.2 VHR-derived guano area
+
+Visualise the area of guano derived from VHR imagery at Cape Crozier for 2020. 
+
+```{r guano-area}
+
+# set working directory
+setwd("D:/Points_test")
+
+# import guano area shapefile (not needed until modelling spatial covariates)
+sf_Crozier_guano <- st_read("Point_process_GA_boundaries/Crozier_2020_1_3031_guano.shp")
+# ensure shapefile has right crs code
+sf_Crozier_guano <- st_transform(sf_Crozier_guano, crs = st_crs(sf_Crozier))
+
+# plot guano area
+GA_plot_Crozier <- ggplot() + 
+  geom_sf(data = sf_Crozier_guano, fill = NA, color = "orange") + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+    ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+GA_plot_Crozier
+
+# show points and guano area together
+Together <- plot(ggarrange(point_plot_Crozier, 
+                           GA_plot_Crozier,
+                        ncol = 2, nrow = 1, labels=c("a","b")))
+#annotate_figure(Together, left = "Northing", bottom = "Easting")
+
+```
+
+### 2.3 Model domain (coastline boundary)
+
+Use the boundary of the coastline at Cape Crozier and the bounds of the VHR image to create the boundary (domain) to be used to create INLA (Integrated Nested Laplace Approximation) mesh for the LGCP model. This domain specifies the area to focus the model calculations within (excludes the area beyond the coastline as we know there are no nests present there).
+
+```{r coastline-boundary}
+
+# set working directory
+setwd("D:/Points_test")
+
+# import Crozier coastline boundary
+sf_Crozier_boundary <- st_read("Crozier_boundary.shp")
+# transform shapefile so it has the right crs code
+sf_Crozier_boundary <- st_transform(sf_Crozier_boundary, crs = st_crs(sf_Crozier))
+st_crs(sf_Crozier_boundary)
+
+# plot coastline boundary
+Boundary_plot_Crozier <- ggplot() + 
+  geom_sf(data = sf_Crozier_boundary, fill = NA, color = "blue", linetype = "dashed") +
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+    ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+Boundary_plot_Crozier
+
+```
+
+### 2.4 Model samplers area (drone image boundary)
+
+Use the boundary of the drone image of Cape Crozier in 2020 (2020-11-29) to create the samplers area which is the area that has been 100% sampled for points (penguin nests).
+
+```{r UAV-boundary}
+
+# set working directory
+setwd("D:/Points_test")
+
+# import Crozier UAV bounds shapefile
+sf_Crozier_UAV_area <- st_read("Crozier_20201129_UAV/Crozier_20201129_3031_UAV_area.shp")
+# ensure shapefile has right crs code
+sf_Crozier_UAV_area <- st_transform(sf_Crozier_UAV_area, crs = st_crs(sf_Crozier))
+st_crs(sf_Crozier_UAV_area)
+
+# plot UAV boundary
+UAV_plot_Crozier <- ggplot() + 
+  geom_sf(data = sf_Crozier_UAV_area, fill = NA, color = "red") + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+    ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+UAV_plot_Crozier
+
+```
+
+## 3.0 Creating the mesh
+
+```{r mesh}
+
+# mesh parameters
+# this is 1/15 study size using x range
+# x range is longer than y here
+Crozier_max.edge <- diff(range(st_coordinates(sf_Crozier)[,1]))/(3*5)
+print(Crozier_max.edge)
+# ~150 metres
+
+# expand outer layer out by 1/5
+Crozier_bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
+print(Crozier_bound.outer)
+# ~500 metres
+
+# create Crozier mesh
+Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as boundary
+                            max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
+                            offset = c(Crozier_max.edge, Crozier_bound.outer),
+                            cutoff = Crozier_max.edge/10,
+                            crs = st_crs(sf_Crozier))
+
+# plot boundary mesh
+mesh_plot_Crozier <- ggplot() + 
+  geom_fm(data = Crozier_mesh) + 
+  geom_sf(data = sf_Crozier_boundary, fill = NA, color = "blue", linetype = "dashed") + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+    ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+mesh_plot_Crozier
+
+```
+
+## 4.0 LGCP model fitting
+
+```{r LGCP-model}
+
+# create the spatial random field
+# fit an LGCP model to the locations of the penguin nests
+
+# the probability of the range exceeding that to be 0.5
+# the prior for the variance explained by the spatial effect
+# is set that the probability that the SD exceeds 1 is 0.5
+
+# define the SPDE prior (matern)
+matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
+                              prior.range = c(250, 0.5), # changed distance decay in metres after running model (100 looked okay but doesn't match model results)
+                              prior.sigma = c(0.5, 0.1)) # amount of spatial variation
+
+# formula specification of model components
+# specify a model where for 2D models geometry is on the left of ~
+# and an SPDE + Intercept(1) on the right
+# define the domain of the LGCP and model components
+# (spatial SPDE effect and Intercept)
+null_cmp <- geometry ~
+  Intercept(1) + # fixed effect (eventually add here the covariates of slope etc. using rasters)
+  mySmooth(geometry, model = matern) # random effect
+
+# formula (geometry is response = point locations)
+# mysmooth for spatial autocorrelation
+
+# use lgcp() with 2D model components, the sf points and the sf boundary
+null_model <- lgcp(null_cmp, # formula
+                    data = sf_Crozier, # locations
+                    samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
+                    domain = list(geometry = Crozier_mesh), # mesh
+                    options = list(
+                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
+                    )
+)
+# takes less than ~2 mins to run
+
+summary(null_model)
+# mean should be density per m 2 (once unlogged)
+
+# predicting intensity # predict the spatial intensity surface l
+lambda <- predict(
+  null_model, 
+  fm_pixels(Crozier_mesh, format = "sf", mask = sf_Crozier_UAV_area), # use samplers 
+  ~ exp(mySmooth + Intercept) # exp to unlog, mySmooth is field
+  )
+
+sum(lambda$mean)
+# under predicting based on UAV counts of over 200,000? 
+# just a sum of densities
+
+# need to sum over prediction grid
+
+# make prediction grid as sf points
+grid_pts <- fm_pixels(
+  Crozier_mesh,
+  format = "sf",
+  mask = sf_Crozier_UAV_area
+)
+
+# predict intensity per m2
+lambda <- predict(
+  null_model,
+  grid_pts, # use this instead of fm_pixels
+  ~ exp(mySmooth + Intercept)
+)
+
+# cell spacing from the point coordinates
+coords <- st_coordinates(grid_pts)
+dx <- median(diff(sort(unique(coords[,1]))))
+dy <- median(diff(sort(unique(coords[,2]))))
+
+cell_area <- dx * dy  # m2 per pixel
+
+# multiply and sum
+total_pred <- sum(lambda$mean * cell_area)
+total_pred
+
+# plot log intensity
+Intensity_plot <- ggplot() +
+  geom_fm(data = Crozier_mesh) +
+  gg(lambda, geom = "tile")
+
+Intensity_plot
+# intensity is highest at 0.5 ish (seems right for density)
+
+```
