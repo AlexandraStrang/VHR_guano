@@ -8,6 +8,8 @@ Dataset.1.0 <- read.csv("Merged_masterdata.csv")
 # Colours for each colony
 colours <- c("darkblue","royalblue","skyblue")
 
+# hello everyone
+
 ##########################################################################
 # Create dataset with only within season data and covariates
 ##########################################################################
