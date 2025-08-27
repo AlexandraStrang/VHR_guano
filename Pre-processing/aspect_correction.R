@@ -12,6 +12,7 @@ setwd("D:/Points_test")
 library(dplyr)
 library(circular)
 library(terra)
+library(raster)
 library(maptools)
 
 #######################################################################################################################################################
@@ -61,10 +62,11 @@ trueaspect= function(data,dx,xll,yll){
 
 # correct crozier aspect
 # read in aspect raster
-croz_aspect_raw <- rast("Rasters/Cape_Crozier_aspect.tif") # 2m aspect raster
+croz_aspect_raw <- raster("Rasters/Cape_Crozier_aspect.tif") # 2m aspect raster
+crs(croz_aspect_raw)
 # get lower left coordinates from raster
-c_xll <- croz_aspect_raw@extent@xmin
-c_yll <- croz_aspect_raw@extent@ymin
+c_xll <- xmin(croz_aspect_raw)
+c_yll <- ymin(croz_aspect_raw)
 # Convert to matrix
 c_data <- raster::as.matrix(croz_aspect_raw, mode="numeric")
 # replace NA with -9999
@@ -75,14 +77,18 @@ c_aspect_correct <- trueaspect(c_data,dx=2,xll=c_xll,yll=c_yll)
 # check that distribution looks right
 hist(c_aspect_correct[!c_aspect_correct==-9999])
 # replace -9999 with NA (not sure this step is meaningful)
-#c_aspect_correct[c_aspect_correct==-9999]<- NA
+c_aspect_correct[c_aspect_correct==-9999]<- NA
 
 # save as raster
 c_aspect_corr_rast <- raster(c_aspect_correct,xmn=croz_aspect_raw@extent@xmin,
                              xmx=croz_aspect_raw@extent@xmax,
                              ymn=croz_aspect_raw@extent@ymin,
                              ymx=croz_aspect_raw@extent@ymax, crs=croz_aspect_raw@crs)
-#c_aspect_corr_rast@file@nodatavalue<- -9999
+c_aspect_corr_rast@file@nodatavalue<- -9999
 c_aspect_corr_rast@data@min<- 0
 
 writeRaster(c_aspect_corr_rast,"Rasters/Cape_Crozier_aspect_corrected.tif", overwrite=TRUE)
+
+# correct aspect
+corr_aspect_raster <- rast("Rasters/Cape_Crozier_aspect_corrected.tif")
+plot(corr_aspect_raster)
