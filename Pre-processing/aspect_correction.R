@@ -5,7 +5,8 @@
 # code provided by Annie Schmidt 
 # from: https://github.com/pointblue/adpe_subcol_success/blob/main/code/data_prep/aspect_correction.R
 
-# 
+# set working directory
+setwd("D:/Points_test")
 
 # load packages
 library(dplyr)
@@ -15,7 +16,7 @@ library(maptools)
 
 #######################################################################################################################################################
 # aspect correction function modified from matlab function by 
-# Antarctic Science 19 (1), 129-130 (2007) © Antarctic Science Ltd Printed in the UK DOI: 10.1017/S0954102007000181
+# Antarctic Science 19 (1), 129-130 (2007) ? Antarctic Science Ltd Printed in the UK DOI: 10.1017/S0954102007000181
 # 129
 # Short Note
 # Correcting GIS-based slope aspect calculations for the Polar Regions
@@ -60,7 +61,7 @@ trueaspect= function(data,dx,xll,yll){
 
 # correct crozier aspect
 # read in aspect raster
-croz_aspect_raw <-rast(".tif")
+croz_aspect_raw <- rast("Rasters/Cape_Crozier_aspect.tif") # 2m aspect raster
 # get lower left coordinates from raster
 c_xll <- croz_aspect_raw@extent@xmin
 c_yll <- croz_aspect_raw@extent@ymin
@@ -74,14 +75,14 @@ c_aspect_correct <- trueaspect(c_data,dx=2,xll=c_xll,yll=c_yll)
 # check that distribution looks right
 hist(c_aspect_correct[!c_aspect_correct==-9999])
 # replace -9999 with NA (not sure this step is meaningful)
-c_aspect_correct[c_aspect_correct==-9999]<- NA
+#c_aspect_correct[c_aspect_correct==-9999]<- NA
 
 # save as raster
 c_aspect_corr_rast <- raster(c_aspect_correct,xmn=croz_aspect_raw@extent@xmin,
                              xmx=croz_aspect_raw@extent@xmax,
                              ymn=croz_aspect_raw@extent@ymin,
                              ymx=croz_aspect_raw@extent@ymax, crs=croz_aspect_raw@crs)
-c_aspect_corr_rast@file@nodatavalue<- -9999
+#c_aspect_corr_rast@file@nodatavalue<- -9999
 c_aspect_corr_rast@data@min<- 0
 
-# writeRaster(c_aspect_corr_rast,"croz_aspect_corrected.tif", overwrite=TRUE)
+writeRaster(c_aspect_corr_rast,"Rasters/Cape_Crozier_aspect_corrected.tif", overwrite=TRUE)
