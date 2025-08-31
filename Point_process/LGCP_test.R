@@ -321,7 +321,7 @@ ggplot(results_range, aes(x = r0, y = total_pred)) +
 # Build LGCP model with covarites
 
 # Incorporate guano area and terrain variables as rasters
-guano_raster <- rast("Rasters/cleaned_Crozier_2020_1_3031_guano.tif")# could use 2m guano raster
+guano_raster <- rast("Rasters/cleaned_Crozier_2020_1_3031_guano.tif") # could use 2m guano raster
 slope_raster <- rast("Rasters/Cape_Crozier_slope.tif") # 2m slope raster
 aspect_raster <- rast("Rasters/Cape_Crozier_aspect.tif") # 2m aspect raster
 roughness_raster <- rast("Rasters/Cape_Crozier_roughness.tif") # 2m
@@ -435,6 +435,9 @@ plot(covariate_stack)
 # should aspect be northness instead?
 northness_raster <- cos(aspect_raster * pi / 180)
 northness_raster <- standardize(northness_raster)
+# correct aspect
+corr_aspect_raster <- rast("Rasters/Cape_Crozier_aspect_corrected.tif")
+plot(corr_aspect_raster)
 
 # crop rasters/ fill in NAs
 slope_raster[is.na(slope_raster)] <- 0
@@ -444,25 +447,53 @@ guano_raster[is.na(guano_raster)] <- 0
 guano_raster   <- standardize(guano_raster)
 plot(guano_raster)
 
+#####################################################
+percent_guano_raster <- rast("CrozierGuano_2m.tif")
+plot(percent_guano_raster) # doesn't include below 0s
+
+res(percent_guano_raster) # 2m x 2m
+unique(percent_guano_raster)
+
+percent_guano_raster[values(percent_guano_raster) > 1] <- 0
+
+# Extract values from raster
+vals <- values(percent_guano_raster)
+
+# Remove NAs and filter out 0s and 1s
+filtered_vals <- vals[!is.na(vals) & vals > 0 & vals < 1]
+mean(filtered_vals)
+
+# Plot histogram of intermediate values only
+hist(filtered_vals,
+     main = "Histogram of Guano Percent Values (Excluding 0 & 1)",
+     xlab = "Value",
+     ylab = "Frequency",
+     col = "skyblue",
+     breaks = 100)
+
 # tesing done
 ############################################################
 
+# subdivide mesh
+# splits triangles into subtriangles
+mesh_sub <- fm_subdivide(Crozier_mesh,3)
+
 # update model formula to include covariates
-matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
+matern <- inla.spde2.pcmatern(mesh = mesh_sub,
                               prior.range = c(250, 0.5), # distance decay in metres
                               prior.sigma = c(1, 0.5)) # amount of spatial variation
 
 # trial
 Full_cmp <- geometry ~
   Intercept(1) + 
-  guano(guano_raster, model = "linear") +
+  percentguano(percent_guano_raster, model = "linear") +
   #slope(slope_raster, model = "linear") +
   mySmooth(geometry, model = matern) # random effect
 
 Full_model <- lgcp(Full_cmp, # formula
                    data = sf_Crozier, # locations
                    samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
-                   domain = list(geometry = Crozier_mesh), # mesh
+                   domain = list(geometry = mesh_sub), # mesh
                    options = list(
                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
                    )
@@ -482,7 +513,7 @@ grid_pts <- fm_pixels(
 lambda <- predict(
   Full_model,
   grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept + guano)
+  ~ exp(mySmooth + Intercept + percentguano)
 )
 
 # cell spacing from the point coordinates
