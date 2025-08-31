@@ -512,26 +512,6 @@ Guano_model <- lgcp(Guano_cmp, # formula
 
 summary(Guano_model)
 
-# standardise guano raster (mean of 0 sd of 1)
-guano_raster   <- standardize(guano_raster)
-plot(guano_raster)
-
-# formula
-Guano_cmp2 <- geometry ~
-  Intercept(1) + 
-  guano(guano_raster, model = "linear") +
-  mySmooth(geometry, model = matern) # random effect
-
-Guano_model2 <- lgcp(Guano_cmp2, # formula
-                   data = sf_Crozier, # locations
-                   samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
-                   domain = list(geometry = Crozier_mesh), # mesh
-                   options = list(
-                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
-                   )
-)
-
-summary(Guano_model2)
 
 ```
 
