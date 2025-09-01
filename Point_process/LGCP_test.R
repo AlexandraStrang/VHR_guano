@@ -47,6 +47,8 @@ sf_Crozier_UAV_area <- st_read("Crozier_20201129_UAV/Crozier_20201129_3031_UAV_a
 sf_Crozier_UAV_area <- st_transform(sf_Crozier_UAV_area, crs = st_crs(sf_Crozier))
 st_crs(sf_Crozier_UAV_area)
 
+#################################################################################################################
+
 # mesh parameters
 # this is 1/15 study size using x range
 # x range is longer than y here
@@ -65,6 +67,9 @@ Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as bo
                             offset = c(Crozier_max.edge, Crozier_bound.outer),
                             cutoff = Crozier_max.edge/10,
                             crs = st_crs(sf_Crozier))
+
+# save mesh as shapefile
+# to crop terrain variables to mesh boundary
 
 # plot boundary mesh
 mesh_plot_Crozier <- ggplot() + 
@@ -117,6 +122,7 @@ Together <- plot(ggarrange(mesh_plot_Crozier,
                         ncol = 3, nrow = 1, labels=c("a","b","c")))
 #annotate_figure(Together, left = "Northing", bottom = "Easting")
 
+#################################################################################################################
 
 # use Cape Crozier 2019 GA and points
 # for model training as it has better precison and
@@ -208,6 +214,8 @@ Intensity_plot
 # sensitivity to priors
 # covariates
 # residual map
+
+#################################################################################################################
 
 # analyse sensitivity of model to prior specifications
 
@@ -317,144 +325,34 @@ ggplot(results_range, aes(x = r0, y = total_pred)) +
        title = "Predicted total vs prior range") +
   theme_minimal()
 
+#################################################################################################################
 
 # Build LGCP model with covarites
 
-# Incorporate guano area and terrain variables as rasters
-guano_raster <- rast("Rasters/cleaned_Crozier_2020_1_3031_guano.tif") # could use 2m guano raster
-slope_raster <- rast("Rasters/Cape_Crozier_slope.tif") # 2m slope raster
-aspect_raster <- rast("Rasters/Cape_Crozier_aspect.tif") # 2m aspect raster
-roughness_raster <- rast("Rasters/Cape_Crozier_roughness.tif") # 2m
-TRI_raster <- rast("Rasters/Cape_Crozier_TRI.tif") # 2m
-
-# use plot() to view
-# use summary() for stats
-# use res() for resolution
-# use crs() for crs
-
-# zonal stats within UAV bounds
-zones <- vect(sf_Crozier_boundary)
-zonal(guano_raster, zones, fun = "mean")  # Mean raster value per zone
-zonal(slope_raster, zones, fun = "mean")
+# use continuous guano raster
+percent_guano_raster <- rast("CrozierGuano_2m.tif")
 
 # change guano crs to match 
-crs(guano_raster) <- "EPSG:3031"
-crs(guano_raster)
-
-# remove old gunao from guano raster
-rcl <- matrix(c(
-  0, 0, 0,  # background stays 0
-  1, 1, 1,  # fresh guano stays 1
-  2, 2, 0   # old guano becomes 0
-), ncol = 3, byrow = TRUE)
-guano_raster <- classify(guano_raster, rcl, include.lowest = TRUE, right = NA)
-plot(guano_raster)
-# now should just be fresh guano 1 and everything else 0
-
-# match res/ extent to GA
-ref <- guano_raster
-slope_raster     <- resample(slope_raster, ref)
-aspect_raster    <- resample(aspect_raster, ref)
-roughness_raster <- resample(roughness_raster, ref)
-TRI_raster       <- resample(TRI_raster, ref)
-# other rasters are res of 0.4 now
-
-# scale
-# (mean of 0 sd of 1)
-standardize <- function(r) {
-  m <- global(r, fun = "mean", na.rm = TRUE)[1, 1]
-  s <- global(r, fun = "sd", na.rm = TRUE)[1, 1]
-  (r - m) / s
-}
-
-# apply to continuous variables only
-slope_raster     <- standardize(slope_raster)
-aspect_raster    <- standardize(aspect_raster)
-roughness_raster <- standardize(roughness_raster)
-TRI_raster       <- standardize(TRI_raster)
-
-# check for collinearity between covariates?
-cov_stack <- c(guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
-
-cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
-
-cor(cov_values)
-
-############################################################
-# testing
-
-# look into NA error
-# Count NAs
-n_na <- sum(is.na(values(guano_raster)))
-cat("Number of NA cells:", n_na)
-
-# Plot to see where they are
-plot(is.na(guano_raster), main = "NA Locations in Guano Raster")
-
-# check other covariates too
-n_na <- sum(is.na(values(slope_raster)))
-cat("Number of NA cells:", n_na)
-
-# Plot to see where they are
-plot(is.na(guano_raster), main = "NA Locations in Slope Raster")
-
-# mask covariates to mesh size as a polygon
-
-mesh_coords <- Crozier_mesh$loc[, 1:2]
-mesh_points <- st_as_sf(data.frame(x = mesh_coords[,1], y = mesh_coords[,2]),
-                        coords = c("x", "y"), crs = 3031)
-mesh_hull <- st_convex_hull(st_union(mesh_points))
-mesh_vect <- vect(mesh_hull)
-
-guano_raster     <- mask(guano_raster, mesh_vect)
-slope_raster     <- mask(slope_raster, mesh_vect)
-aspect_raster    <- mask(aspect_raster, mesh_vect)
-roughness_raster <- mask(roughness_raster, mesh_vect)
-TRI_raster       <- mask(TRI_raster, mesh_vect)
-
-valid_mask <- !is.na(guano_raster) & 
-  !is.na(slope_raster) & 
-  !is.na(aspect_raster) & 
-  !is.na(roughness_raster) & 
-  !is.na(TRI_raster)
-guano_raster     <- mask(guano_raster, valid_mask, maskvalues = FALSE)
-slope_raster     <- mask(slope_raster, valid_mask, maskvalues = FALSE)
-aspect_raster    <- mask(aspect_raster, valid_mask, maskvalues = FALSE)
-roughness_raster <- mask(roughness_raster, valid_mask, maskvalues = FALSE)
-TRI_raster       <- mask(TRI_raster, valid_mask, maskvalues = FALSE)
-
-# neither the polygon or the mask work
-
-# see if any extra NAs
-sum(is.na(values(slope_raster)))
-sum(is.na(values(guano_raster)))
-# check for misalignment
-covariate_stack <- c(guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
-plot(covariate_stack)
-
-# should aspect be northness instead?
-northness_raster <- cos(aspect_raster * pi / 180)
-northness_raster <- standardize(northness_raster)
-# correct aspect
-corr_aspect_raster <- rast("Rasters/Cape_Crozier_aspect_corrected.tif")
-plot(corr_aspect_raster)
-
-# crop rasters/ fill in NAs
-slope_raster[is.na(slope_raster)] <- 0
-
-guano_raster[is.na(guano_raster)] <- 0
-
-guano_raster   <- standardize(guano_raster)
-plot(guano_raster)
-
-#####################################################
-percent_guano_raster <- rast("CrozierGuano_2m.tif")
-plot(percent_guano_raster) # doesn't include below 0s
+crs(percent_guano_raster) <- "EPSG:3031"
+crs(percent_guano_raster)
 
 res(percent_guano_raster) # 2m x 2m
-unique(percent_guano_raster)
+
+# load terrain variables as rasters
+slope_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_slope.tif") # 2m slope raster
+aspect_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_aspect_corrected.tif") # 2m aspect raster
+roughness_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_roughness.tif") # 2m
+TRI_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_TRI.tif") # 2m
+
+# change corrected aspect crs to match 
+crs(aspect_raster) <- "EPSG:3031"
+crs(aspect_raster)
+
+# match guano area extent to terrain rasters
+percent_guano_raster <- extend(percent_guano_raster, slope_raster)
 
 percent_guano_raster[values(percent_guano_raster) > 1] <- 0
+percent_guano_raster[is.na(percent_guano_raster)] <- 0
 
 # Extract values from raster
 vals <- values(percent_guano_raster)
@@ -471,12 +369,39 @@ hist(filtered_vals,
      col = "skyblue",
      breaks = 100)
 
-# tesing done
-############################################################
+plot(percent_guano_raster)
+
+# scale
+# (mean of 0 sd of 1)
+standardize <- function(r) {
+  m <- global(r, fun = "mean", na.rm = TRUE)[1, 1]
+  s <- global(r, fun = "sd", na.rm = TRUE)[1, 1]
+  (r - m) / s
+}
+
+# apply to continuous variables
+percent_guano_raster   <- standardize(percent_guano_raster)
+slope_raster     <- standardize(slope_raster)
+aspect_raster    <- standardize(aspect_raster)
+roughness_raster <- standardize(roughness_raster)
+TRI_raster       <- standardize(TRI_raster)
+
+# check for misalignment
+covariate_plot <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
+plot(covariate_plot)
+
+# check for collinearity between covariates
+cov_stack <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
+
+cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
+
+cor(cov_values)
+
+#################################################################################################################
 
 # subdivide mesh
 # splits triangles into subtriangles
-mesh_sub <- fm_subdivide(Crozier_mesh,3)
+mesh_sub <- fm_subdivide(Crozier_mesh,6) # try 1/18 of max.edge
 
 # update model formula to include covariates
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
@@ -487,7 +412,7 @@ matern <- inla.spde2.pcmatern(mesh = mesh_sub,
 Full_cmp <- geometry ~
   Intercept(1) + 
   percentguano(percent_guano_raster, model = "linear") +
-  #slope(slope_raster, model = "linear") +
+  slope(slope_raster, model = "linear") +
   mySmooth(geometry, model = matern) # random effect
 
 Full_model <- lgcp(Full_cmp, # formula
@@ -504,7 +429,7 @@ summary(Full_model)
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  Crozier_mesh,
+  mesh_sub,
   format = "sf",
   mask = sf_Crozier_UAV_area
 )
@@ -513,7 +438,7 @@ grid_pts <- fm_pixels(
 lambda <- predict(
   Full_model,
   grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept + percentguano)
+  ~ exp(mySmooth + Intercept + percentguano + slope)
 )
 
 # cell spacing from the point coordinates
