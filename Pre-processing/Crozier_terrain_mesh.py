@@ -53,11 +53,11 @@ class DemMetrics:
             'std': float(array.std())
         }
 
-    def _clip_dem_to_aoi(self):
+    def clip_dem_to_mesh(self):
         """
         clip the DEM to the matching mesh shapefile
         """
-        mesh_path = os.path.join(MESH_DIR, f'Crozier_mesh.shp')
+        mesh_path = os.path.join(MESH_DIR, 'Crozier_mesh.shp')
         if not os.path.exists(mesh_path):
             raise FileNotFoundError(f"Mesh shapefile not found for {self.colony_name}: {mesh_path}")
 
@@ -91,7 +91,7 @@ class DemMetrics:
         UseExceptions()
 
         # clip DEM to mesh before processing
-        self._clip_dem_to_mesh()
+        self.clip_dem_to_mesh()
 
         for p in processes:
             try:
