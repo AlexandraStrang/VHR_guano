@@ -63,7 +63,7 @@ Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as bo
 
 
 slope_raster <- rast("Cape_Crozier_slope.tif") # 2m slope raster
-aspect_raster <- rast("Cape_Crozier_aspect.tif") # 2m aspect raster
+# 2m aspect raster
 roughness_raster <- rast("Cape_Crozier_roughness.tif") # 2m
 TRI_raster <- rast("Cape_Crozier_TRI.tif") # 2m
 
