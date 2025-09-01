@@ -62,8 +62,9 @@ trueaspect= function(data,dx,xll,yll){
 
 # correct crozier aspect
 # read in aspect raster
-croz_aspect_raw <- raster("Rasters/Cape_Crozier_aspect.tif") # 2m aspect raster
+croz_aspect_raw <- raster("Rasters/Crozier_terrain_mesh/Cape_Crozier_aspect.tif") # 2m aspect raster
 crs(croz_aspect_raw)
+hist(croz_aspect_raw)
 # get lower left coordinates from raster
 c_xll <- xmin(croz_aspect_raw)
 c_yll <- ymin(croz_aspect_raw)
@@ -87,7 +88,7 @@ c_aspect_corr_rast <- raster(c_aspect_correct,xmn=croz_aspect_raw@extent@xmin,
 c_aspect_corr_rast@file@nodatavalue<- -9999
 c_aspect_corr_rast@data@min<- 0
 
-writeRaster(c_aspect_corr_rast,"Rasters/Cape_Crozier_aspect_corrected.tif", overwrite=TRUE)
+writeRaster(c_aspect_corr_rast,"Rasters/Crozier_terrain_mesh/Cape_Crozier_aspect_corrected.tif", overwrite=TRUE)
 
 # correct aspect
 corr_aspect_raster <- rast("Rasters/Cape_Crozier_aspect_corrected.tif")
