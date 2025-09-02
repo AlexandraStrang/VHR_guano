@@ -68,8 +68,36 @@ Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as bo
                             cutoff = Crozier_max.edge/10,
                             crs = st_crs(sf_Crozier))
 
-# save mesh as shapefile
+# save mesh as shapefile - Koerich et al.
 # to crop terrain variables to mesh boundary
+# save Cozier mesh (do once)
+vertices <- Crozier_mesh$loc  # Vertex coordinates
+triangles <- Crozier_mesh$graph$tv  # Triangle indices
+
+# create polygons from triangles
+polygon_list <- lapply(1:nrow(triangles), function(i) {
+  # Get the vertex indices for the current triangle
+  tri <- triangles[i, ]
+  
+  # create a matrix of coordinates for the triangle
+  coords <- vertices[tri, c(1, 2)]  
+  
+  # close the polygon by repeating the first point
+  coords <- rbind(coords, coords[1, ])
+  
+  # create an sf polygon
+  st_polygon(list(coords))
+})
+
+# combine all polygons into an sf object
+mesh_polygons <- st_sf(
+  geometry = st_sfc(polygon_list),
+  crs = st_crs(sf_Crozier) # Set CRS
+)
+
+# save polygon
+st_write(mesh_polygons, "Crozier_mesh/Crozier_mesh.shp")
+
 
 # plot boundary mesh
 mesh_plot_Crozier <- ggplot() + 
@@ -408,7 +436,7 @@ matern <- inla.spde2.pcmatern(mesh = mesh_sub,
                               prior.range = c(250, 0.5), # distance decay in metres
                               prior.sigma = c(1, 0.5)) # amount of spatial variation
 
-# trial
+# trial with GA and slope
 Full_cmp <- geometry ~
   Intercept(1) + 
   percentguano(percent_guano_raster, model = "linear") +
