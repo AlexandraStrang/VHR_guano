@@ -176,6 +176,8 @@ Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as bo
                             cutoff = Crozier_max.edge/10,
                             crs = st_crs(sf_Crozier))
 
+# mesh is exported as shapefile to crop terrain covariates to mesh boundary
+
 # plot boundary mesh
 mesh_plot_Crozier <- ggplot() + 
   geom_fm(data = Crozier_mesh) + 
@@ -402,43 +404,7 @@ ggplot(results_range, aes(x = r0, y = total_pred)) +
 # Build LGCP model with covarites
 
 # Incorporate guano area and terrain variables as rasters
-guano_raster <- rast("Rasters/cleaned_Crozier_2020_1_3031_guano.tif") # could use 2m guano raster
-slope_raster <- rast("Rasters/Cape_Crozier_slope.tif") # 2m slope raster
-aspect_raster <- rast("Rasters/Cape_Crozier_aspect.tif") # 2m aspect raster
-roughness_raster <- rast("Rasters/Cape_Crozier_roughness.tif") # 2m
-TRI_raster <- rast("Rasters/Cape_Crozier_TRI.tif") # 2m
 
-# use plot() to view
-# use summary() for stats
-# use res() for resolution
-# use crs() for crs
-
-# zonal stats within UAV bounds
-zones <- vect(sf_Crozier_boundary)
-zonal(guano_raster, zones, fun = "mean")  # Mean raster value per zone
-zonal(slope_raster, zones, fun = "mean")
-
-# change guano crs to match 
-crs(guano_raster) <- "EPSG:3031"
-crs(guano_raster)
-
-# remove old gunao from guano raster
-rcl <- matrix(c(
-  0, 0, 0,  # background stays 0
-  1, 1, 1,  # fresh guano stays 1
-  2, 2, 0   # old guano becomes 0
-), ncol = 3, byrow = TRUE)
-guano_raster <- classify(guano_raster, rcl, include.lowest = TRUE, right = NA)
-plot(guano_raster)
-# now should just be fresh guano 1 and everything else 0
-
-# match extent to GA
-ref <- guano_raster
-slope_raster     <- resample(slope_raster, ref)
-aspect_raster    <- resample(aspect_raster, ref)
-roughness_raster <- resample(roughness_raster, ref)
-TRI_raster       <- resample(TRI_raster, ref)
-# other rasters are res of 0.4 now
 
 ```
 
@@ -448,21 +414,7 @@ TRI_raster       <- resample(TRI_raster, ref)
 
 # scale
 # (mean of 0 sd of 1)
-standardize <- function(r) {
-  m <- global(r, fun = "mean", na.rm = TRUE)[1, 1]
-  s <- global(r, fun = "sd", na.rm = TRUE)[1, 1]
-  (r - m) / s
-}
 
-# apply to continuous variables only
-slope_raster     <- standardize(slope_raster)
-plot(slope_raster)
-aspect_raster    <- standardize(aspect_raster)
-plot(aspect_raster)
-roughness_raster <- standardize(roughness_raster)
-plot(roughness_raster)
-TRI_raster       <- standardize(TRI_raster)
-plot(TRI_raster)
 
 ```
 
@@ -470,13 +422,6 @@ plot(TRI_raster)
 
 ```{r check_collinearity}
 
-# check for collinearity between covariates?
-cov_stack <- c(guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
-
-cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
-
-cor(cov_values)
-# slope, terrain roughness, and TRI
 
 ```
 
@@ -484,33 +429,7 @@ cor(cov_values)
 
 ```{r LGCP_covariates}
 
-# update model formula to include covariates
-matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
-                              prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
 
-# look at just guano first
-
-# Change NA values to 0 values
-guano_raster[is.na(guano_raster)] <- 0
-plot(guano_raster)
-
-# formula
-Guano_cmp <- geometry ~
-  Intercept(1) + 
-  guano(guano_raster, model = "linear") +
-  mySmooth(geometry, model = matern) # random effect
-
-Guano_model <- lgcp(Guano_cmp, # formula
-                   data = sf_Crozier, # locations
-                   samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
-                   domain = list(geometry = Crozier_mesh), # mesh
-                   options = list(
-                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
-                   )
-)
-
-summary(Guano_model)
 
 
 ```
