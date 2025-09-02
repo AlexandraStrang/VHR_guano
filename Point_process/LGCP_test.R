@@ -401,7 +401,7 @@ cor(cov_values)
 
 # subdivide mesh
 # splits triangles into subtriangles
-mesh_sub <- fm_subdivide(Crozier_mesh,6) # try 1/18 of max.edge
+mesh_sub <- fm_subdivide(Crozier_mesh,3) # try 1/9 of max.edge
 
 # update model formula to include covariates
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
