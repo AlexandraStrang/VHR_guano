@@ -1,4 +1,4 @@
-# r script for testing LGCP null models
+# r script for testing LGCP models
 # creator: Alexandra Strang
 # created: 2025
 
@@ -60,40 +60,92 @@ Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as bo
                            offset = c(Crozier_max.edge, Crozier_bound.outer),
                            cutoff = Crozier_max.edge/10,
                            crs = st_crs(sf_Crozier))
+# saved mesh as polygon to crop terrain rasters
 
+# Build LGCP model with covarites
 
-slope_raster <- rast("Cape_Crozier_slope.tif") # 2m slope raster
-# 2m aspect raster
-roughness_raster <- rast("Cape_Crozier_roughness.tif") # 2m
-TRI_raster <- rast("Cape_Crozier_TRI.tif") # 2m
-
+# use continuous guano raster
 percent_guano_raster <- rast("CrozierGuano_2m.tif")
+
 # change guano crs to match 
 crs(percent_guano_raster) <- "EPSG:3031"
 crs(percent_guano_raster)
 
+res(percent_guano_raster) # 2m x 2m
+
+# terrain rasters clipped by mesh
+slope_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_slope.tif") # 2m slope raster
+aspect_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_aspect_corrected.tif") # 2m aspect raster
+roughness_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_Roughness.tif") # 2m
+TRI_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_TRI.tif") # 2m
+
+# change corrected aspect crs to match 
+crs(aspect_raster) <- "EPSG:3031"
+crs(aspect_raster)
+
+# match guano area extent to terrain rasters
+percent_guano_raster <- extend(percent_guano_raster, slope_raster)
+
 percent_guano_raster[values(percent_guano_raster) > 1] <- 0
+percent_guano_raster[is.na(percent_guano_raster)] <- 0
 
 # Extract values from raster
 vals <- values(percent_guano_raster)
 
 # Remove NAs and filter out 0s and 1s
 filtered_vals <- vals[!is.na(vals) & vals > 0 & vals < 1]
+mean(filtered_vals)
+
+# Plot histogram of intermediate values only
+hist(filtered_vals,
+     main = "Histogram of Guano Percent Values (Excluding 0 & 1)",
+     xlab = "Value",
+     ylab = "Frequency",
+     col = "skyblue",
+     breaks = 100)
+
+plot(percent_guano_raster)
+
+# scale
+# (mean of 0 sd of 1)
+standardize <- function(r) {
+  m <- global(r, fun = "mean", na.rm = TRUE)[1, 1]
+  s <- global(r, fun = "sd", na.rm = TRUE)[1, 1]
+  (r - m) / s
+}
+
+# apply to continuous variables
+percent_guano_raster   <- standardize(percent_guano_raster)
+slope_raster     <- standardize(slope_raster)
+aspect_raster    <- standardize(aspect_raster)
+roughness_raster <- standardize(roughness_raster)
+TRI_raster       <- standardize(TRI_raster)
+
+# check for misalignment
+covariate_plot <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
+plot(covariate_plot)
+
+# check for collinearity between covariates
+cov_stack <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
+
+cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
+
+cor(cov_values)
 
 # subdivide mesh
 # splits triangles into subtriangles
-mesh_sub <- fm_subdivide(Crozier_mesh,3)
+mesh_sub <- fm_subdivide(Crozier_mesh,3) # try 1/9 of max.edge
 
 # update model formula to include covariates
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
+                              prior.range = c(150, 0.5), # distance decay in metres
+                              prior.sigma = c(5, 0.5)) # amount of spatial variation
 
-# trial
+# trial with just GA
 Full_cmp <- geometry ~
   Intercept(1) + 
   percentguano(percent_guano_raster, model = "linear") +
-  #slope(slope_raster, model = "linear") +
+  slope(slope_raster, model = "linear") +
   mySmooth(geometry, model = matern) # random effect
 
 Full_model <- lgcp(Full_cmp, # formula
@@ -107,10 +159,13 @@ Full_model <- lgcp(Full_cmp, # formula
 
 summary(Full_model)
 
+print(summary(lambda$mean))
+hist(lambda$mean, breaks = 100, main = "Predicted Intensity", xlab = "Penguins/m²")
+
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  Crozier_mesh,
+  mesh_sub,
   format = "sf",
   mask = sf_Crozier_UAV_area
 )
@@ -119,16 +174,27 @@ grid_pts <- fm_pixels(
 lambda <- predict(
   Full_model,
   grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept + percentguano)
+  ~ exp(mySmooth + Intercept + percentguano + slope)
 )
 
 # cell spacing from the point coordinates
 coords <- st_coordinates(grid_pts)
 dx <- median(diff(sort(unique(coords[,1]))))
 dy <- median(diff(sort(unique(coords[,2]))))
+print(paste("Prediction grid resolution:", dx, "x", dy, "meters"))
 
 cell_area <- dx * dy  # m2 per pixel
 
 # multiply and sum
 total_pred <- sum(lambda$mean * cell_area)
 print(total_pred)
+
+# integration
+lambda_integrated <- predict(
+  Full_model,
+  grid_pts,
+  ~ exp(mySmooth + Intercept + percentguano + slope),
+  integrate = TRUE
+)
+print(sum(lambda_integrated$mean))
+
