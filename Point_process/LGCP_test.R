@@ -30,7 +30,7 @@ Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
 sf_Crozier <- st_as_sf(Crozier_xy, coords = c("x", "y"), crs = 3031)
 st_crs(sf_Crozier)
 
-# import guano area shapefile (not needed until modelling spatial covariates)
+# import guano area shapefile
 sf_Crozier_guano <- st_read("Point_process_GA_boundaries/Crozier_2020_1_3031_guano.shp")
 # ensure shapefile has right crs code
 sf_Crozier_guano <- st_transform(sf_Crozier_guano, crs = st_crs(sf_Crozier))
