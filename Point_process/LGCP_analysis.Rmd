@@ -76,7 +76,7 @@ Visualise the area of guano derived from VHR imagery at Cape Crozier for 2020.
 
 ```{r guano-area}
 
-# import guano area shapefile (not needed until modelling spatial covariates)
+# import guano area shapefile
 sf_Crozier_guano <- st_read("Point_process_GA_boundaries/Crozier_2020_1_3031_guano.shp")
 # ensure shapefile has right crs code
 sf_Crozier_guano <- st_transform(sf_Crozier_guano, crs = st_crs(sf_Crozier))
