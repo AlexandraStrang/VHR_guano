@@ -4,14 +4,13 @@
 
 # set working directory
 setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
-#setwd("D:/Points_test/LGCP_nesi_data")
 
 # load packages 
 library(sf)
 library(fmesher)
 library(ggplot2)
-library(INLA)
-library(inlabru) # for lgcp()
+library(INLA) # version 25.09.04
+library(inlabru) # for lgcp() version 2.13.0
 library(dplyr)
 library(purrr)
 library(tidyr)
@@ -71,8 +70,8 @@ mesh_plot_Crozier
 # null LGCP
 # define the SPDE priors (matern)
 matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
-                              prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
+                              prior.range = c(1000, 0.5), # distance decay in metres
+                              prior.sigma = c(5, 0.5)) # amount of spatial variation
 
 # formula specification of model components
 # specify a model where for 2D models geometry is on the left of ~
@@ -107,6 +106,8 @@ GA_plot_Crozier <- ggplot() +
 
 GA_plot_Crozier
 
+print("running null model with 1000, 0.5 range prior and 5, 0.5 sigma prior")
+
 # use lgcp() with 2D model components, the sf points and the sf boundary
 null_model <- lgcp(null_cmp, # formula
                    data = sf_Crozier, # locations
@@ -131,8 +132,10 @@ grid_pts <- fm_pixels(
   mask = sf_Crozier_guano_buffered
 )
 
+anyNA(st_coordinates(grid_pts))
+
 # predict intensity per m2
-lambda <- predict(
+null_lambda <- predict(
   null_model,
   grid_pts, # use this instead of fm_pixels
   ~ exp(mySmooth + Intercept)
@@ -146,8 +149,16 @@ dy <- median(diff(sort(unique(coords[,2]))))
 cell_area <- dx * dy  # m2 per pixel
 
 # multiply and sum
-total_pred <- sum(lambda$mean * cell_area)
-print(total_pred)
+null_total_pred <- sum(null_lambda$mean * cell_area)
+print(null_total_pred)
+
+# plot log intensity
+null_Intensity_plot <- ggplot() +
+  geom_fm(data = Crozier_mesh) +
+  gg(null_lambda, geom = "tile")
+
+null_Intensity_plot
+
 
 # Build LGCP model with covarites
 
@@ -238,12 +249,16 @@ sub_mesh_plot_Crozier <- ggplot() +
 
 sub_mesh_plot_Crozier
 
+# need to adjust prior range as spatial autocorrelation wont be explaining as much
+
 # update model formula to include covariates
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
                               prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
+                              prior.sigma = c(5, 0.5)) # amount of spatial variation
 
-# trial
+print("running full model with 250, 0.5 range prior and 5, 0.5 sigma prior")
+
+# full
 Full_cmp <- geometry ~
   Intercept(1) + 
   percentguano(percent_guano_raster, model = "linear") +
@@ -269,8 +284,10 @@ grid_pts <- fm_pixels(
   mask = sf_Crozier_guano_buffered
 )
 
+anyNA(st_coordinates(grid_pts))
+
 # predict intensity per m2
-lambda <- predict(
+full_lambda <- predict(
   Full_model,
   grid_pts, # use this instead of fm_pixels
   ~ exp(mySmooth + Intercept + percentguano + slope)
@@ -287,21 +304,78 @@ cell_area <- dx * dy  # m2 per pixel
 print(cell_area)
 
 # multiply and sum
-total_pred <- sum(lambda$mean * cell_area)
-print(total_pred)
+full_total_pred <- sum(full_lambda$mean * cell_area)
+print(full_total_pred)
 
 # plot log intensity
-Intensity_plot <- ggplot() +
+full_Intensity_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
-  gg(lambda, geom = "tile")
+  gg(full_lambda, geom = "tile")
 
-Intensity_plot
+full_Intensity_plot
+
+print("running guano model with 250, 0.5 range prior and 5, 0.5 sigma prior")
+
+guano_cmp <- geometry ~
+  Intercept(1) + 
+  percentguano(percent_guano_raster, model = "linear") +
+  mySmooth(geometry, model = matern) # random effect
+
+guano_model <- lgcp(guano_cmp, # formula
+                   data = sf_Crozier, # locations
+                   samplers = sf_Crozier_guano_buffered, # sample area
+                   domain = list(geometry = mesh_sub), # mesh
+                   options = list(
+                     control.inla = list(verbose = TRUE),
+                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
+)
+
+summary(guano_model)
+
+# need to sum over prediction grid
+# make prediction grid as sf points
+grid_pts <- fm_pixels(
+  mesh_sub,
+  format = "sf",
+  mask = sf_Crozier_guano_buffered
+)
+
+anyNA(st_coordinates(grid_pts))
+
+# predict intensity per m2
+guano_lambda <- predict(
+  guano_model,
+  grid_pts, # use this instead of fm_pixels
+  ~ exp(mySmooth + Intercept + percentguano)
+)
+
+# cell spacing from the point coordinates
+coords <- st_coordinates(grid_pts)
+dx <- median(diff(sort(unique(coords[,1]))))
+dy <- median(diff(sort(unique(coords[,2]))))
+print(dx)
+print(dy)
+
+cell_area <- dx * dy  # m2 per pixel
+print(cell_area)
+
+# multiply and sum
+guano_total_pred <- sum(guano_lambda$mean * cell_area)
+print(guano_total_pred)
+
+# plot log intensity
+guano_Intensity_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(guano_lambda, geom = "tile")
+
+guano_Intensity_plot
+
+print("running slope model with 250, 0.5 range prior and 5, 0.5 sigma prior")
 
 # terrain only
 Terrain_cmp <- geometry ~
   Intercept(1) + 
   slope(slope_raster, model = "linear") +
-  aspect(aspect_raster, model = "linear") +
   mySmooth(geometry, model = matern) # random effect
 
 Terrain_model <- lgcp(Terrain_cmp, # formula
@@ -323,11 +397,13 @@ grid_pts <- fm_pixels(
   mask = sf_Crozier_guano_buffered
 )
 
+anyNA(st_coordinates(grid_pts))
+
 # predict intensity per m2
-lambda <- predict(
+terrain_lambda <- predict(
   Terrain_model,
   grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept + slope + aspect)
+  ~ exp(mySmooth + Intercept + slope)
 )
 
 # cell spacing from the point coordinates
@@ -341,6 +417,44 @@ cell_area <- dx * dy  # m2 per pixel
 print(cell_area)
 
 # multiply and sum
-total_pred <- sum(lambda$mean * cell_area)
-print(total_pred)
+terrain_total_pred <- sum(terrain_lambda$mean * cell_area)
+print(terrain_total_pred)
 
+# plot log intensity
+terrain_Intensity_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(terrain_lambda, geom = "tile")
+
+terrain_Intensity_plot
+
+
+# save outputs
+
+saveRDS(null_model, file = "null_model.rds")
+saveRDS(Full_model, file = "full_model.rds")
+saveRDS(guano_model, file = "guano_model.rds")
+saveRDS(Terrain_model, file = "terrain_model.rds")
+
+fixed_null <- as.data.frame(summary(null_model)$fixed)
+write.csv(fixed_null, "null_model_fixed_summary.csv")
+
+random_null <- as.data.frame(summary(null_model)$random)
+write.csv(random_null, "null_model_random_summary.csv")
+
+fixed_full <- as.data.frame(summary(Full_model)$fixed)
+write.csv(fixed_full, "full_model_fixed_summary.csv")
+
+random_full <- as.data.frame(summary(Full_model)$random)
+write.csv(random_full, "full_model_random_summary.csv")
+
+fixed_guano <- as.data.frame(summary(guano_model)$fixed)
+write.csv(fixed_guano, "guano_model_fixed_summary.csv")
+
+random_guano <- as.data.frame(summary(guano_model)$random)
+write.csv(random_guano, "guano_model_random_summary.csv")
+
+fixed_terrain <- as.data.frame(summary(Terrain_model)$fixed)
+write.csv(fixed_terrain, "terrain_model_fixed_summary.csv")
+
+random_terrain <- as.data.frame(summary(Terrain_model)$random)
+write.csv(random_terrain, "terrain_model_random_summary.csv")
