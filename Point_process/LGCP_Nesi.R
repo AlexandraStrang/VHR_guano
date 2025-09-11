@@ -35,6 +35,9 @@ sf_Crozier_boundary <- st_read("Crozier_boundary.shp")
 sf_Crozier_boundary <- st_transform(sf_Crozier_boundary, crs = st_crs(sf_Crozier))
 st_crs(sf_Crozier_boundary)
 
+# add 100 m buffer around coastline boundary
+buff_boundary <- st_buffer(sf_Crozier_boundary, dist = 100)
+
 # mesh parameters
 # this is 1/15 study size using x range
 # x range is longer than y here
@@ -48,10 +51,10 @@ print(Crozier_bound.outer)
 # ~450 metres
 
 # create Crozier mesh
-Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as boundary
+Crozier_mesh <- fm_mesh_2d(boundary = buff_boundary, # use buffered coastline as boundary
                            max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
                            offset = c(Crozier_max.edge, Crozier_bound.outer),
-                           cutoff = Crozier_max.edge/10,
+                           cutoff = Crozier_max.edge/5,
                            crs = st_crs(sf_Crozier))
 print(Crozier_mesh$n)
 
@@ -71,7 +74,7 @@ mesh_plot_Crozier
 # define the SPDE priors (matern)
 matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
                               prior.range = c(1000, 0.5), # distance decay in metres
-                              prior.sigma = c(5, 0.5)) # amount of spatial variation
+                              prior.sigma = c(1, 0.5)) # amount of spatial variation
 
 # formula specification of model components
 # specify a model where for 2D models geometry is on the left of ~
@@ -106,7 +109,7 @@ GA_plot_Crozier <- ggplot() +
 
 GA_plot_Crozier
 
-print("running null model with 1000, 0.5 range prior and 5, 0.5 sigma prior")
+print("running null model with 1000, 0.5 range prior and 1, 0.5 sigma prior")
 
 # use lgcp() with 2D model components, the sf points and the sf boundary
 null_model <- lgcp(null_cmp, # formula
@@ -252,11 +255,11 @@ sub_mesh_plot_Crozier
 # need to adjust prior range as spatial autocorrelation wont be explaining as much
 
 # update model formula to include covariates
-matern <- inla.spde2.pcmatern(mesh = mesh_sub,
+matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
                               prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(5, 0.5)) # amount of spatial variation
+                              prior.sigma = c(0.5, 0.5)) # amount of spatial variation
 
-print("running full model with 250, 0.5 range prior and 5, 0.5 sigma prior")
+print("running full model with 250, 0.5 range prior and 0.5, 0.5 sigma prior")
 
 # full
 Full_cmp <- geometry ~
@@ -268,7 +271,7 @@ Full_cmp <- geometry ~
 Full_model <- lgcp(Full_cmp, # formula
                    data = sf_Crozier, # locations
                    samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = mesh_sub), # mesh
+                   domain = list(geometry = Crozier_mesh), # mesh
                    options = list(
                      control.inla = list(verbose = TRUE),
                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
@@ -279,7 +282,7 @@ summary(Full_model)
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  mesh_sub,
+  Crozier_mesh,
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
@@ -309,12 +312,12 @@ print(full_total_pred)
 
 # plot log intensity
 full_Intensity_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
+  geom_fm(data = Crozier_mesh) +
   gg(full_lambda, geom = "tile")
 
 full_Intensity_plot
 
-print("running guano model with 250, 0.5 range prior and 5, 0.5 sigma prior")
+print("running guano model with 250, 0.5 range prior and 0.5, 0.5 sigma prior")
 
 guano_cmp <- geometry ~
   Intercept(1) + 
@@ -324,7 +327,7 @@ guano_cmp <- geometry ~
 guano_model <- lgcp(guano_cmp, # formula
                    data = sf_Crozier, # locations
                    samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = mesh_sub), # mesh
+                   domain = list(geometry = Crozier_mesh), # mesh
                    options = list(
                      control.inla = list(verbose = TRUE),
                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
@@ -335,7 +338,7 @@ summary(guano_model)
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  mesh_sub,
+  Crozier_mesh,
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
@@ -365,96 +368,13 @@ print(guano_total_pred)
 
 # plot log intensity
 guano_Intensity_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
+  geom_fm(data = Crozier_mesh) +
   gg(guano_lambda, geom = "tile")
 
 guano_Intensity_plot
 
-print("running slope model with 250, 0.5 range prior and 5, 0.5 sigma prior")
 
-# terrain only
-Terrain_cmp <- geometry ~
-  Intercept(1) + 
-  slope(slope_raster, model = "linear") +
-  mySmooth(geometry, model = matern) # random effect
-
-Terrain_model <- lgcp(Terrain_cmp, # formula
-                   data = sf_Crozier, # locations
-                   samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = mesh_sub), # mesh
-                   options = list(
-                     control.inla = list(verbose = TRUE),
-                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
-)
-
-summary(Terrain_model)
-
-# need to sum over prediction grid
-# make prediction grid as sf points
-grid_pts <- fm_pixels(
-  mesh_sub,
-  format = "sf",
-  mask = sf_Crozier_guano_buffered
-)
-
-anyNA(st_coordinates(grid_pts))
-
-# predict intensity per m2
-terrain_lambda <- predict(
-  Terrain_model,
-  grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept + slope)
-)
-
-# cell spacing from the point coordinates
-coords <- st_coordinates(grid_pts)
-dx <- median(diff(sort(unique(coords[,1]))))
-dy <- median(diff(sort(unique(coords[,2]))))
-print(dx)
-print(dy)
-
-cell_area <- dx * dy  # m2 per pixel
-print(cell_area)
-
-# multiply and sum
-terrain_total_pred <- sum(terrain_lambda$mean * cell_area)
-print(terrain_total_pred)
-
-# plot log intensity
-terrain_Intensity_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(terrain_lambda, geom = "tile")
-
-terrain_Intensity_plot
-
-
-# save outputs
-
+# save model outputs
 saveRDS(null_model, file = "null_model.rds")
 saveRDS(Full_model, file = "full_model.rds")
 saveRDS(guano_model, file = "guano_model.rds")
-saveRDS(Terrain_model, file = "terrain_model.rds")
-
-fixed_null <- as.data.frame(summary(null_model)$fixed)
-write.csv(fixed_null, "null_model_fixed_summary.csv")
-
-random_null <- as.data.frame(summary(null_model)$random)
-write.csv(random_null, "null_model_random_summary.csv")
-
-fixed_full <- as.data.frame(summary(Full_model)$fixed)
-write.csv(fixed_full, "full_model_fixed_summary.csv")
-
-random_full <- as.data.frame(summary(Full_model)$random)
-write.csv(random_full, "full_model_random_summary.csv")
-
-fixed_guano <- as.data.frame(summary(guano_model)$fixed)
-write.csv(fixed_guano, "guano_model_fixed_summary.csv")
-
-random_guano <- as.data.frame(summary(guano_model)$random)
-write.csv(random_guano, "guano_model_random_summary.csv")
-
-fixed_terrain <- as.data.frame(summary(Terrain_model)$fixed)
-write.csv(fixed_terrain, "terrain_model_fixed_summary.csv")
-
-random_terrain <- as.data.frame(summary(Terrain_model)$random)
-write.csv(random_terrain, "terrain_model_random_summary.csv")
