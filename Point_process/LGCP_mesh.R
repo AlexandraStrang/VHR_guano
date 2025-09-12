@@ -30,6 +30,9 @@ sf_Crozier_boundary <- st_read("Crozier_boundary.shp")
 sf_Crozier_boundary <- st_transform(sf_Crozier_boundary, crs = st_crs(sf_Crozier))
 st_crs(sf_Crozier_boundary)
 
+# add 100 m buffer around coastline boundary
+buff_boundary <- st_buffer(sf_Crozier_boundary, dist = 100)
+
 # mesh parameters
 # this is 1/15 study size using x range
 # x range is longer than y here
@@ -43,10 +46,10 @@ print(Crozier_bound.outer)
 # ~450 metres
 
 # create Crozier mesh
-Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as boundary
+Crozier_mesh <- fm_mesh_2d(boundary = buff_boundary, # use buffered coastline as boundary
                            max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
                            offset = c(Crozier_max.edge, Crozier_bound.outer),
-                           cutoff = Crozier_max.edge/10,
+                           cutoff = Crozier_max.edge/5,
                            crs = st_crs(sf_Crozier))
 print(Crozier_mesh$n)
 
