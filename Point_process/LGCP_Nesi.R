@@ -92,6 +92,8 @@ null_cmp <- geometry ~
 sf_Crozier_guano <- st_read("Crozier_2020_1_3031_guano.shp")
 # ensure shapefile has right crs code
 sf_Crozier_guano <- st_transform(sf_Crozier_guano, crs = st_crs(sf_Crozier))
+
+# create 100m buffer around guano area
 sf_Crozier_guano_buffered <- st_buffer(sf_Crozier_guano, dist = 100)
 sf_Crozier_guano_buffered <- st_sf(geometry = st_union(sf_Crozier_guano_buffered))
 crs(sf_Crozier_guano_buffered)
@@ -238,28 +240,17 @@ cor(cov_values)
 
 # subdivide mesh
 # splits triangles into subtriangles
-mesh_sub <- fm_subdivide(Crozier_mesh,3) # try 1/9 of max.edge
+mesh_sub <- fm_subdivide(Crozier_mesh,6)
 print(mesh_sub$n)
-
-sub_mesh_plot_Crozier <- ggplot() + 
-  geom_fm(data = mesh_sub) + 
-  labs( 
-    x = "Easting", 
-    y = "Northing", 
-  ) + 
-  theme_minimal()
-# geom_sf converts to degrees
-
-sub_mesh_plot_Crozier
 
 # need to adjust prior range as spatial autocorrelation wont be explaining as much
 
 # update model formula to include covariates
-matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
-                              prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(0.5, 0.5)) # amount of spatial variation
+matern <- inla.spde2.pcmatern(mesh = mesh_sub,
+                              prior.range = c(100, 0.5), # distance decay in metres
+                              prior.sigma = c(1.5, 0.5)) # amount of spatial variation
 
-print("running full model with 250, 0.5 range prior and 0.5, 0.5 sigma prior")
+print("running full model with 100, 0.5 range prior and 1.5, 0.5 sigma prior and mesh sub 6")
 
 # full
 Full_cmp <- geometry ~
@@ -271,7 +262,7 @@ Full_cmp <- geometry ~
 Full_model <- lgcp(Full_cmp, # formula
                    data = sf_Crozier, # locations
                    samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = Crozier_mesh), # mesh
+                   domain = list(geometry = mesh_sub), # mesh
                    options = list(
                      control.inla = list(verbose = TRUE),
                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
@@ -282,7 +273,7 @@ summary(Full_model)
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  Crozier_mesh,
+  mesh_sub,
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
@@ -312,12 +303,12 @@ print(full_total_pred)
 
 # plot log intensity
 full_Intensity_plot <- ggplot() +
-  geom_fm(data = Crozier_mesh) +
+  geom_fm(data = mesh_sub) +
   gg(full_lambda, geom = "tile")
 
 full_Intensity_plot
 
-print("running guano model with 250, 0.5 range prior and 0.5, 0.5 sigma prior")
+print("running guano model with 100, 0.5 range prior and 1.5, 0.5 sigma prior and mesh sub 6")
 
 guano_cmp <- geometry ~
   Intercept(1) + 
@@ -325,12 +316,12 @@ guano_cmp <- geometry ~
   mySmooth(geometry, model = matern) # random effect
 
 guano_model <- lgcp(guano_cmp, # formula
-                   data = sf_Crozier, # locations
-                   samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = Crozier_mesh), # mesh
-                   options = list(
-                     control.inla = list(verbose = TRUE),
-                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
+                    data = sf_Crozier, # locations
+                    samplers = sf_Crozier_guano_buffered, # sample area
+                    domain = list(geometry = mesh_sub), # mesh
+                    options = list(
+                      control.inla = list(verbose = TRUE),
+                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
 )
 
 summary(guano_model)
@@ -338,7 +329,7 @@ summary(guano_model)
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  Crozier_mesh,
+  mesh_sub,
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
@@ -368,13 +359,13 @@ print(guano_total_pred)
 
 # plot log intensity
 guano_Intensity_plot <- ggplot() +
-  geom_fm(data = Crozier_mesh) +
+  geom_fm(data = mesh_sub) +
   gg(guano_lambda, geom = "tile")
 
 guano_Intensity_plot
-
 
 # save model outputs
 saveRDS(null_model, file = "null_model.rds")
 saveRDS(Full_model, file = "full_model.rds")
 saveRDS(guano_model, file = "guano_model.rds")
+
