@@ -3,7 +3,8 @@
 # created: 2025
 
 # set working directory
-setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
+#setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
+setwd("F:/Points_test/LGCP_nesi_data")
 
 # load packages 
 library(sf)
@@ -71,22 +72,6 @@ mesh_plot_Crozier <- ggplot() +
 mesh_plot_Crozier
 
 # null LGCP
-# define the SPDE priors (matern)
-matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
-                              prior.range = c(1000, 0.5), # distance decay in metres
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
-
-# formula specification of model components
-# specify a model where for 2D models geometry is on the left of ~
-# and an SPDE + Intercept(1) on the right
-# define the domain of the LGCP and model components
-# (spatial SPDE effect and Intercept)
-null_cmp <- geometry ~
-  Intercept(1) + # fixed effect (eventually add here the covariates of slope etc. using rasters)
-  mySmooth(geometry, model = matern) # random effect
-
-# formula (geometry is response = point locations)
-# mysmooth for spatial autocorrelation
 
 # import guano area shapefile
 sf_Crozier_guano <- st_read("Crozier_2020_1_3031_guano.shp")
@@ -110,6 +95,23 @@ GA_plot_Crozier <- ggplot() +
 # geom_sf converts to degrees
 
 GA_plot_Crozier
+
+# define the SPDE priors (matern)
+matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
+                              prior.range = c(1000, 0.5), # distance decay in metres
+                              prior.sigma = c(1, 0.5)) # amount of spatial variation
+
+# formula specification of model components
+# specify a model where for 2D models geometry is on the left of ~
+# and an SPDE + Intercept(1) on the right
+# define the domain of the LGCP and model components
+# (spatial SPDE effect and Intercept)
+null_cmp <- geometry ~
+  Intercept(1) + # fixed effect (eventually add here the covariates of slope etc. using rasters)
+  mySmooth(geometry, model = matern) # random effect
+
+# formula (geometry is response = point locations)
+# mysmooth for spatial autocorrelation
 
 print("running null model with 1000, 0.5 range prior and 1, 0.5 sigma prior")
 
@@ -136,8 +138,6 @@ grid_pts <- fm_pixels(
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
-
-anyNA(st_coordinates(grid_pts))
 
 # predict intensity per m2
 null_lambda <- predict(
@@ -240,17 +240,17 @@ cor(cov_values)
 
 # subdivide mesh
 # splits triangles into subtriangles
-mesh_sub <- fm_subdivide(Crozier_mesh,6)
+mesh_sub <- fm_subdivide(Crozier_mesh,3)
 print(mesh_sub$n)
 
 # need to adjust prior range as spatial autocorrelation wont be explaining as much
 
 # update model formula to include covariates
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(100, 0.5), # distance decay in metres
-                              prior.sigma = c(1.5, 0.5)) # amount of spatial variation
+                              prior.range = c(250, 0.1), # distance decay in metres
+                              prior.sigma = c(0.5, 0.1)) # amount of spatial variation
 
-print("running full model with 100, 0.5 range prior and 1.5, 0.5 sigma prior and mesh sub 6")
+print("running full model with 250, 0.1 range prior and 0.5, 0.1 sigma prior and mesh sub 3")
 
 # full
 Full_cmp <- geometry ~
@@ -262,7 +262,7 @@ Full_cmp <- geometry ~
 Full_model <- lgcp(Full_cmp, # formula
                    data = sf_Crozier, # locations
                    samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = mesh_sub), # mesh
+                   domain = list(geometry = Crozier_mesh), # mesh
                    options = list(
                      control.inla = list(verbose = TRUE),
                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
@@ -273,12 +273,10 @@ summary(Full_model)
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  mesh_sub,
+  Crozier_mesh,
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
-
-anyNA(st_coordinates(grid_pts))
 
 # predict intensity per m2
 full_lambda <- predict(
@@ -308,7 +306,7 @@ full_Intensity_plot <- ggplot() +
 
 full_Intensity_plot
 
-print("running guano model with 100, 0.5 range prior and 1.5, 0.5 sigma prior and mesh sub 6")
+print("running guano model with 250, 0.1 range prior and 0.5, 0.1 sigma prior and mesh sub 3")
 
 guano_cmp <- geometry ~
   Intercept(1) + 
@@ -333,8 +331,6 @@ grid_pts <- fm_pixels(
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
-
-anyNA(st_coordinates(grid_pts))
 
 # predict intensity per m2
 guano_lambda <- predict(
