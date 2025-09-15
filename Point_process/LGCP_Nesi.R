@@ -3,8 +3,7 @@
 # created: 2025
 
 # set working directory
-#setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
-setwd("F:/Points_test/LGCP_nesi_data")
+setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
 
 # load packages 
 library(sf)
@@ -262,7 +261,7 @@ Full_cmp <- geometry ~
 Full_model <- lgcp(Full_cmp, # formula
                    data = sf_Crozier, # locations
                    samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = Crozier_mesh), # mesh
+                   domain = list(geometry = mesh_sub), # mesh
                    options = list(
                      control.inla = list(verbose = TRUE),
                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
@@ -273,7 +272,7 @@ summary(Full_model)
 # need to sum over prediction grid
 # make prediction grid as sf points
 grid_pts <- fm_pixels(
-  Crozier_mesh,
+  mesh_sub,
   format = "sf",
   mask = sf_Crozier_guano_buffered
 )
