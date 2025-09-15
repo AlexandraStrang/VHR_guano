@@ -101,7 +101,7 @@ class DemMetrics:
 
             print(f"\tDEM processing: {p}")
             desc.dataset = DEMProcessing(os.path.join(self.out_dir, f'{self.colony_name}_{p}.tif'),
-                                        self.dem_path, p, **desc.kwargs)
+                                        self.dem_path, p, **desc.kwargs) # this line is the DEMProcessing function input
             desc.metrics = self._get_ds_metrics(desc.dataset)
             desc.dataset = None
         return self.dem_processes
