@@ -246,10 +246,10 @@ print(mesh_sub$n)
 
 # update model formula to include covariates
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(250, 0.1), # distance decay in metres
-                              prior.sigma = c(0.5, 0.1)) # amount of spatial variation
+                              prior.range = c(25, 0.5), # distance decay in metres
+                              prior.sigma = c(0.01, 0.01)) # amount of spatial variation
 
-print("running full model with 250, 0.1 range prior and 0.5, 0.1 sigma prior and mesh sub 3")
+print("running full model with 25, 0.5 range prior and 0.01, 0.01 sigma prior and mesh sub 3")
 
 # full
 Full_cmp <- geometry ~
@@ -305,7 +305,7 @@ full_Intensity_plot <- ggplot() +
 
 full_Intensity_plot
 
-print("running guano model with 250, 0.1 range prior and 0.5, 0.1 sigma prior and mesh sub 3")
+print("running guano model with 25, 0.5 range prior and 0.01, 0.01 sigma prior and mesh sub 3")
 
 guano_cmp <- geometry ~
   Intercept(1) + 
