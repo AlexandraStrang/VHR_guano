@@ -5,7 +5,8 @@ The scripts for completing analysis in Strang et al. (in prep).
 LGCP model analyses:
 - `LGCP_Nesi.R`: This script contains the R code currently being developed and run on NeSI - 20250910.
 - `LGCP_mesh.R`: This script contains the R code currently being used to construst the 2D triangulated mesh.
-- `LGCP_test.R`: NEEDS UPDATING
+- `LGCP_test.R`: NEEDS UPDATING This script contains the R code for testing model sensitivity to the SPDE priors.
+- `LGCP_candidates.R`: This script contains the R code for testing the LGCP candidate models.
 - `LGCP_analysis.RMD`: NEEDS UPDATING
 
 Pre-processing analyses:
