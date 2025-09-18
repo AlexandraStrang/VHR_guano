@@ -313,7 +313,7 @@ matern2 <- inla.spde2.pcmatern(mesh = mesh_sub,
                               prior.range = c(25, 0.5), 
                               prior.sigma = c(0.01, 0.01))
 
-print("running guano model with 25, 0.5 range prior and 0.01, 0.01 sigma prior and mesh sub 3")
+print("running guano model with 1(1000, 0.5 range prior and 1, 0.5 sigma prior) 2(25, 0.5 range prior and 0.01, 0.01 sigma prior) and mesh sub 3")
 
 G_cmp <- geometry ~
   Intercept(1) + 
