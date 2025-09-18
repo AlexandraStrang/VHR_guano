@@ -1,6 +1,8 @@
-# r script for testing LGCP null models
+# r script for testing LGCP model sensitivity 
 # creator: Alexandra Strang
 # created: 2025
+
+# needs updating
 
 # set working directory
 setwd("D:/Points_test")
@@ -22,6 +24,8 @@ library(terra) # for rasters
 
 # EPSG 3031 is in metres but when plotting geom_sf will convert to degrees
 
+#################################################################################################################
+
 # read in points from xy csv
 # Cape Crozier 2020
 Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
@@ -30,22 +34,14 @@ Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
 sf_Crozier <- st_as_sf(Crozier_xy, coords = c("x", "y"), crs = 3031)
 st_crs(sf_Crozier)
 
-# import guano area shapefile
-sf_Crozier_guano <- st_read("Point_process_GA_boundaries/Crozier_2020_1_3031_guano.shp")
-# ensure shapefile has right crs code
-sf_Crozier_guano <- st_transform(sf_Crozier_guano, crs = st_crs(sf_Crozier))
-
 # import Crozier coastline boundary
 sf_Crozier_boundary <- st_read("Crozier_boundary.shp")
 # transform shapefile so it has the right crs code
 sf_Crozier_boundary <- st_transform(sf_Crozier_boundary, crs = st_crs(sf_Crozier))
 st_crs(sf_Crozier_boundary)
 
-# import Crozier UAV bounds shapefile
-sf_Crozier_UAV_area <- st_read("Crozier_20201129_UAV/Crozier_20201129_3031_UAV_area.shp")
-# ensure shapefile has right crs code
-sf_Crozier_UAV_area <- st_transform(sf_Crozier_UAV_area, crs = st_crs(sf_Crozier))
-st_crs(sf_Crozier_UAV_area)
+# add 100 m buffer around coastline boundary
+buff_boundary <- st_buffer(sf_Crozier_boundary, dist = 100)
 
 #################################################################################################################
 
@@ -56,192 +52,34 @@ Crozier_max.edge <- diff(range(st_coordinates(sf_Crozier)[,1]))/(3*5)
 print(Crozier_max.edge)
 # ~150 metres
 
-# expand outer layer out by 1/5
+# expand outer layer
 Crozier_bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
 print(Crozier_bound.outer)
-# ~500 metres
+# ~450 metres
 
 # create Crozier mesh
-Crozier_mesh <- fm_mesh_2d(boundary = sf_Crozier_boundary, # use coastline as boundary
-                            max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
-                            offset = c(Crozier_max.edge, Crozier_bound.outer),
-                            cutoff = Crozier_max.edge/10,
-                            crs = st_crs(sf_Crozier))
-
-# save mesh as shapefile - Koerich et al.
-# to crop terrain variables to mesh boundary
-# save Cozier mesh (do once)
-vertices <- Crozier_mesh$loc  # Vertex coordinates
-triangles <- Crozier_mesh$graph$tv  # Triangle indices
-
-# create polygons from triangles
-polygon_list <- lapply(1:nrow(triangles), function(i) {
-  # Get the vertex indices for the current triangle
-  tri <- triangles[i, ]
-  
-  # create a matrix of coordinates for the triangle
-  coords <- vertices[tri, c(1, 2)]  
-  
-  # close the polygon by repeating the first point
-  coords <- rbind(coords, coords[1, ])
-  
-  # create an sf polygon
-  st_polygon(list(coords))
-})
-
-# combine all polygons into an sf object
-mesh_polygons <- st_sf(
-  geometry = st_sfc(polygon_list),
-  crs = st_crs(sf_Crozier) # Set CRS
-)
-
-# save polygon
-st_write(mesh_polygons, "Crozier_mesh/Crozier_mesh.shp")
-
-
-# plot boundary mesh
-mesh_plot_Crozier <- ggplot() + 
-  geom_fm(data = Crozier_mesh) + 
-  geom_sf(data = sf_Crozier_boundary, fill = NA, color = "blue", linetype = "dashed") + 
-  labs( 
-    x = "Easting", 
-    y = "Northing", 
-    ) + 
-  theme_minimal()
-# geom_sf converts to degrees
-
-mesh_plot_Crozier
-
-# plot boundary and samplers area
-mesh_plot_Crozier2 <- ggplot() + 
-  geom_fm(data = Crozier_mesh) + 
-  geom_sf(data = sf_Crozier_boundary, fill = NA, color = "blue", linetype = "dashed") +
-  geom_sf(data = sf_Crozier_UAV_area, fill = NA, color = "orange") + 
-  #geom_sf(data = sf_Crozier_guano, fill = NA, color = "red", linetype = "dashed") + 
-  #geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
-  labs( 
-    x = "Easting", 
-    y = "Northing", 
-    ) + 
-  theme_minimal()
-# geom_sf converts to degrees
-
-mesh_plot_Crozier2
-
-# plot boundary, GA, and points
-mesh_plot_Crozier3 <- ggplot() + 
-  geom_fm(data = Crozier_mesh) + 
-  geom_sf(data = sf_Crozier_boundary, fill = NA, color = "blue", linetype = "dashed") + 
-  geom_sf(data = sf_Crozier_guano, fill = NA, color = "red", linetype = "dashed") + 
-  geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
-  labs( 
-    x = "Easting", 
-    y = "Northing", 
-    ) + 
-  theme_minimal()
-# geom_sf converts to degrees
-
-mesh_plot_Crozier3
-
-# plot together
-Together <- plot(ggarrange(mesh_plot_Crozier, 
-                           mesh_plot_Crozier2,
-                           mesh_plot_Crozier3,
-                        ncol = 3, nrow = 1, labels=c("a","b","c")))
-#annotate_figure(Together, left = "Northing", bottom = "Easting")
+Crozier_mesh <- fm_mesh_2d(boundary = buff_boundary, # use buffered coastline as boundary
+                           max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
+                           offset = c(Crozier_max.edge, Crozier_bound.outer),
+                           cutoff = Crozier_max.edge/5,
+                           crs = st_crs(sf_Crozier))
+print(Crozier_mesh$n)
 
 #################################################################################################################
 
-# use Cape Crozier 2019 GA and points
-# for model training as it has better precison and
-# foercasts rather than hindcasts
+# import guano area shapefile for samplers
+sf_Crozier_guano <- st_read("Crozier_2020_1_3031_guano.shp")
+# ensure shapefile has right crs code
+sf_Crozier_guano <- st_transform(sf_Crozier_guano, crs = st_crs(sf_Crozier))
 
-# create the spatial random field
-# fit an LGCP model to the locations of the penguin nests
+# create 100m buffer around guano area
+sf_Crozier_guano_buffered <- st_buffer(sf_Crozier_guano, dist = 100)
+sf_Crozier_guano_buffered <- st_sf(geometry = st_union(sf_Crozier_guano_buffered))
+crs(sf_Crozier_guano_buffered)
 
-# Penalized Complexity (PC) priors
-# the probability of the range exceeding that to be 0.5
-# the prior for the variance explained by the spatial effect
-# is set that the probability that the SD exceeds 1 is 0.5
+#################################################################################################################
 
-# define the SPDE priors (matern)
-matern <- inla.spde2.pcmatern(mesh = Crozier_mesh,
-                              prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
-
-# formula specification of model components
-# specify a model where for 2D models geometry is on the left of ~
-# and an SPDE + Intercept(1) on the right
-# define the domain of the LGCP and model components
-# (spatial SPDE effect and Intercept)
-null_cmp <- geometry ~
-  Intercept(1) + # fixed effect (eventually add here the covariates of slope etc. using rasters)
-  mySmooth(geometry, model = matern) # random effect
-
-# formula (geometry is response = point locations)
-# mysmooth for spatial autocorrelation
-
-# use lgcp() with 2D model components, the sf points and the sf boundary
-null_model <- lgcp(null_cmp, # formula
-                    data = sf_Crozier, # locations
-                    samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
-                    domain = list(geometry = Crozier_mesh), # mesh
-                    options = list(
-                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
-                    )
-)
-# takes less than ~2 mins to run
-
-summary(null_model)
-# mean should be density per m 2 (once unlogged)
-
-# predicting intensity 
-# predict the spatial intensity surface
-lambda <- predict(
-  null_model, 
-  fm_pixels(Crozier_mesh, format = "sf", mask = sf_Crozier_UAV_area), # use samplers 
-  ~ exp(mySmooth + Intercept) # exp to unlog, mySmooth is field
-  )
-# sum of mean just gives density
-
-# need to sum over prediction grid
-# make prediction grid as sf points
-grid_pts <- fm_pixels(
-  Crozier_mesh,
-  format = "sf",
-  mask = sf_Crozier_UAV_area
-)
-
-# predict intensity per m2
-lambda <- predict(
-  null_model,
-  grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept)
-)
-
-# cell spacing from the point coordinates
-coords <- st_coordinates(grid_pts)
-dx <- median(diff(sort(unique(coords[,1]))))
-dy <- median(diff(sort(unique(coords[,2]))))
-
-cell_area <- dx * dy  # m2 per pixel
-
-# multiply and sum
-total_pred <- sum(lambda$mean * cell_area)
-total_pred
-
-# plot log intensity
-Intensity_plot <- ggplot() +
-  geom_fm(data = Crozier_mesh) +
-  gg(lambda, geom = "tile")
-
-Intensity_plot
-# intensity is highest at 0.5 ish (seems right for density, maybe a little low)
-
-# Next steps:
-# sensitivity to priors
-# covariates
-# residual map
+# add null model
 
 #################################################################################################################
 
@@ -352,130 +190,3 @@ ggplot(results_range, aes(x = r0, y = total_pred)) +
        y = "Total predicted count",
        title = "Predicted total vs prior range") +
   theme_minimal()
-
-#################################################################################################################
-
-# Build LGCP model with covarites
-
-# use continuous guano raster
-percent_guano_raster <- rast("CrozierGuano_2m.tif")
-
-# change guano crs to match 
-crs(percent_guano_raster) <- "EPSG:3031"
-crs(percent_guano_raster)
-
-res(percent_guano_raster) # 2m x 2m
-
-# load terrain variables as rasters
-slope_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_slope.tif") # 2m slope raster
-aspect_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_aspect_corrected.tif") # 2m aspect raster
-roughness_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_roughness.tif") # 2m
-TRI_raster <- rast("Rasters/Crozier_terrain_mesh/Cape_Crozier_TRI.tif") # 2m
-
-# change corrected aspect crs to match 
-crs(aspect_raster) <- "EPSG:3031"
-crs(aspect_raster)
-
-# match guano area extent to terrain rasters
-percent_guano_raster <- extend(percent_guano_raster, slope_raster)
-
-percent_guano_raster[values(percent_guano_raster) > 1] <- 0
-percent_guano_raster[is.na(percent_guano_raster)] <- 0
-
-# Extract values from raster
-vals <- values(percent_guano_raster)
-
-# Remove NAs and filter out 0s and 1s
-filtered_vals <- vals[!is.na(vals) & vals > 0 & vals < 1]
-mean(filtered_vals)
-
-# Plot histogram of intermediate values only
-hist(filtered_vals,
-     main = "Histogram of Guano Percent Values (Excluding 0 & 1)",
-     xlab = "Value",
-     ylab = "Frequency",
-     col = "skyblue",
-     breaks = 100)
-
-plot(percent_guano_raster)
-
-# scale
-# (mean of 0 sd of 1)
-standardize <- function(r) {
-  m <- global(r, fun = "mean", na.rm = TRUE)[1, 1]
-  s <- global(r, fun = "sd", na.rm = TRUE)[1, 1]
-  (r - m) / s
-}
-
-# apply to continuous variables
-percent_guano_raster   <- standardize(percent_guano_raster)
-slope_raster     <- standardize(slope_raster)
-aspect_raster    <- standardize(aspect_raster)
-roughness_raster <- standardize(roughness_raster)
-TRI_raster       <- standardize(TRI_raster)
-
-# check for misalignment
-covariate_plot <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
-plot(covariate_plot)
-
-# check for collinearity between covariates
-cov_stack <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
-
-cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
-
-cor(cov_values)
-
-#################################################################################################################
-
-# subdivide mesh
-# splits triangles into subtriangles
-mesh_sub <- fm_subdivide(Crozier_mesh,3) # try 1/9 of max.edge
-
-# update model formula to include covariates
-matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(250, 0.5), # distance decay in metres
-                              prior.sigma = c(1, 0.5)) # amount of spatial variation
-
-# trial with GA and slope
-Full_cmp <- geometry ~
-  Intercept(1) + 
-  percentguano(percent_guano_raster, model = "linear") +
-  slope(slope_raster, model = "linear") +
-  mySmooth(geometry, model = matern) # random effect
-
-Full_model <- lgcp(Full_cmp, # formula
-                   data = sf_Crozier, # locations
-                   samplers = sf_Crozier_UAV_area, # sample area of UAV bounds
-                   domain = list(geometry = mesh_sub), # mesh
-                   options = list(
-                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
-                   )
-)
-
-summary(Full_model)
-
-# need to sum over prediction grid
-# make prediction grid as sf points
-grid_pts <- fm_pixels(
-  mesh_sub,
-  format = "sf",
-  mask = sf_Crozier_UAV_area
-)
-
-# predict intensity per m2
-lambda <- predict(
-  Full_model,
-  grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept + percentguano + slope)
-)
-
-# cell spacing from the point coordinates
-coords <- st_coordinates(grid_pts)
-dx <- median(diff(sort(unique(coords[,1]))))
-dy <- median(diff(sort(unique(coords[,2]))))
-
-cell_area <- dx * dy  # m2 per pixel
-
-# multiply and sum
-total_pred <- sum(lambda$mean * cell_area)
-total_pred
