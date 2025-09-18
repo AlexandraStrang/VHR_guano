@@ -64,3 +64,33 @@ mesh_plot_Crozier <- ggplot() +
 # geom_sf converts to degrees
 
 mesh_plot_Crozier
+
+# save mesh as shapefile - Koerich et al.
+# to crop terrain variables to mesh boundary
+# save Cozier mesh (do once)
+vertices <- Crozier_mesh$loc  # Vertex coordinates
+triangles <- Crozier_mesh$graph$tv  # Triangle indices
+
+# create polygons from triangles
+polygon_list <- lapply(1:nrow(triangles), function(i) {
+  # Get the vertex indices for the current triangle
+  tri <- triangles[i, ]
+  
+  # create a matrix of coordinates for the triangle
+  coords <- vertices[tri, c(1, 2)]  
+  
+  # close the polygon by repeating the first point
+  coords <- rbind(coords, coords[1, ])
+  
+  # create an sf polygon
+  st_polygon(list(coords))
+})
+
+# combine all polygons into an sf object
+mesh_polygons <- st_sf(
+  geometry = st_sfc(polygon_list),
+  crs = st_crs(sf_Crozier) # Set CRS
+)
+
+# save polygon
+st_write(mesh_polygons, "Crozier_mesh/Crozier_mesh.shp")
