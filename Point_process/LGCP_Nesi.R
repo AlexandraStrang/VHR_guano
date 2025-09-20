@@ -297,29 +297,21 @@ null_Intensity_plot <- ggplot() +
 
 null_Intensity_plot
 
-# covariates and 2 spatial fields
-
-# SPDE priors
-# matern 1: large scale processes (same as null)
-matern1 <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(1000, 0.5),
-                              prior.sigma = c(1, 0.5))
-
+# covariates
 
 # need to adjust prior range as spatial autocorrelation wont be explaining as much
 
-# matern 2: smaller scale processes
-matern2 <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(25, 0.5), 
-                              prior.sigma = c(0.01, 0.01))
+# SPDE priors
+matern <- inla.spde2.pcmatern(mesh = mesh_sub,
+                              prior.range = c(100, 0.9), 
+                              prior.sigma = c(1, 0.5))
 
-print("running guano model with 25, 0.5 range prior and 0.01, 0.01 sigma prior and mesh sub 3")
+print("running guano model with 100, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 3")
 
 G_cmp <- geometry ~
   Intercept(1) + 
   percentguano(percent_guano_raster, model = "linear") +
-  mySmooth1(geometry, model = matern1) + # random effect large
-  mysmooth2(geometry, model = matern2) # random effect small
+  mySmooth(geometry, model = matern) # random effect
 
 G_model <- lgcp(G_cmp, # formula
                 data = sf_Crozier, # locations
@@ -344,7 +336,7 @@ grid_pts <- fm_pixels(
 G_lambda <- predict(
   G_model,
   grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth1 + mysmooth2 + Intercept + percentguano)
+  ~ exp(mySmooth + Intercept + percentguano)
 )
 
 # cell spacing from the point coordinates
@@ -368,16 +360,15 @@ G_Intensity_plot <- ggplot() +
 
 G_Intensity_plot
 
-print("running GS model with 1(1000, 0.5 range prior and 1, 0.5 sigma prior) 2(25, 0.5 range prior and 0.01, 0.01 sigma prior) and mesh sub 3")
+print("running GS model with 100, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 3")
 
-# Guano and slope with 2 spatial fields
+# Guano and slope
 GS_cmp <- geometry ~
   Intercept(1) + 
   percentguano(percent_guano_raster, model = "linear") +
   slope(slope_raster, model = "linear") +
-  mySmooth1(geometry, model = matern1) + # random effect large
-  mysmooth2(geometry, model = matern2) # random effect small
-
+  mySmooth(geometry, model = matern) # random effect
+  
 GS_model <- lgcp(GS_cmp, # formula
                    data = sf_Crozier, # locations
                    samplers = sf_Crozier_guano_buffered, # sample area
@@ -401,7 +392,7 @@ grid_pts <- fm_pixels(
 GS_lambda <- predict(
   GS_model,
   grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth1 + mysmooth2 + Intercept + percentguano + slope)
+  ~ exp(mySmooth + Intercept + percentguano + slope)
 )
 
 # cell spacing from the point coordinates
