@@ -3,8 +3,8 @@
 # created: 2025
 
 # set working directory
+# path to the data
 setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
-#setwd("D:/PhD_Chap1_part2/LGCP_nesi_data")
 
 # load packages 
 library(sf)
