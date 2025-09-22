@@ -1,4 +1,4 @@
-# m7: fixed effect priors and 250,0.9 and 1,0.5
+# m7: fixed effect priors and 100,0.9 and 0.1,0.01
 
 # r script for testing LGCP models
 # creator: Alexandra Strang
