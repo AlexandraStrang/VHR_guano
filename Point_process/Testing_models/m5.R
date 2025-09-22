@@ -1,4 +1,4 @@
-# m5: fixed effect oriors and 250,0.9 and 1,0.5
+# m5: fixed effect priors and 250,0.9 and 1,0.5
 
 # r script for testing LGCP models
 # creator: Alexandra Strang
@@ -23,10 +23,10 @@ library(terra) # for rasters
 results_path <- "/home/stranga/00_nesi_projects/landcare04225_nobackup/Alexandra_results"
 
 # model path
-m1_path <- file.path(results_path, "m1")
+m5_path <- file.path(results_path, "m5")
 
 # ensure model folder exists
-if (!dir.exists(m1_path)) dir.create(m1_path, recursive = TRUE)
+if (!dir.exists(m5_path)) dir.create(m5_path, recursive = TRUE)
 
 # sessionInfo() - important to note r version and versions of inlabru, INLA, fmesher
 # R version 4.5.0 (2025-04-11 ucrt)
@@ -230,7 +230,7 @@ G_Intensity_plot <- ggplot() +
 
 G_Intensity_plot
 
-ggsave(file.path(m1_path, "G_Intensity_plot.png"), G_Intensity_plot, 
+ggsave(file.path(m5_path, "G_Intensity_plot.png"), G_Intensity_plot, 
        width = 8, height = 5, units = "in", 
        dpi = 600)
 
@@ -296,11 +296,11 @@ GS_Intensity_plot <- ggplot() +
 
 GS_Intensity_plot
 
-ggsave(file.path(m1_path, "GS_Intensity_plot.png"), GS_Intensity_plot, 
+ggsave(file.path(m5_path, "GS_Intensity_plot.png"), GS_Intensity_plot, 
        width = 8, height = 5, units = "in", 
        dpi = 600)
 
 # save model outputs
-saveRDS(null_model, file = file.path(m1_path, "null_model.rds"))
-saveRDS(GS_model, file = file.path(m1_path, "GS_model.rds"))
-saveRDS(G_model, file = file.path(m1_path, "G_model.rds"))
+saveRDS(null_model, file = file.path(m5_path, "null_model.rds"))
+saveRDS(GS_model, file = file.path(m5_path, "GS_model.rds"))
+saveRDS(G_model, file = file.path(m5_path, "G_model.rds"))
