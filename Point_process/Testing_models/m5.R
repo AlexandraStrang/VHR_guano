@@ -171,8 +171,8 @@ print("running guano model with 250, 0.9 range prior and 1, 0.5 sigma prior and 
 print("fixed effects: mean 0 and prec 1")
 
 G_cmp <- geometry ~
-  Intercept(1, model = "linear", mean = 0, prec = 1) + 
-  percentguano(percent_guano_raster, model = "linear", mean = 0, prec = 1) +
+  Intercept(1) + 
+  percentguano(percent_guano_raster, model = "linear") +
   mySmooth(geometry, model = matern)
 
 
@@ -182,7 +182,14 @@ G_model <- lgcp(G_cmp, # formula
                 domain = list(geometry = mesh_sub), # mesh
                 options = list(
                   control.inla = list(verbose = TRUE),
-                  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
+                  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE),
+                  control.fixed = list(
+                    mean.intercept = 0,
+                    prec.intercept = 1,
+                    mean = c(0),
+                    prec = c(1)
+                  )
+                )
 )
 
 summary(G_model)
@@ -232,9 +239,9 @@ print("fixed effects: mean 0 and prec 1")
 
 # Guano and slope
 GS_cmp <- geometry ~
-  Intercept(1, model = "linear", mean = 0, prec = 1) + 
-  percentguano(percent_guano_raster, model = "linear", mean = 0, prec = 1) +
-  slope(slope_raster, model = "linear", mean = 0, prec = 1) +
+  Intercept(1) + 
+  percentguano(percent_guano_raster, model = "linear") +
+  slope(slope_raster, model = "linear") +
   mySmooth(geometry, model = matern) # random effect
 
 GS_model <- lgcp(GS_cmp, # formula
@@ -242,8 +249,13 @@ GS_model <- lgcp(GS_cmp, # formula
                  samplers = sf_Crozier_guano_buffered, # sample area
                  domain = list(geometry = mesh_sub), # mesh
                  options = list(
-                   control.inla = list(verbose = TRUE),
-                   control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE))
+                   control.fixed = list(
+                     mean.intercept = 0,
+                     prec.intercept = 1,
+                     mean = c(0,0),
+                     prec = c(1,1)
+                   )
+                 )
 )
 
 summary(GS_model)
