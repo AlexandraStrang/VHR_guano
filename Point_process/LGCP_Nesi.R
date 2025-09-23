@@ -4,7 +4,8 @@
 
 # set working directory
 # path to the data
-setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
+#setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
+setwd("D:/Points_test/LGCP_nesi_data")
 
 # load packages 
 library(sf)
@@ -40,22 +41,20 @@ st_crs(sf_Crozier_boundary)
 buff_boundary <- st_buffer(sf_Crozier_boundary, dist = 100)
 
 # mesh parameters
-# this is 1/15 study size using x range
-# x range is longer than y here
-Crozier_max.edge <- diff(range(st_coordinates(sf_Crozier)[,1]))/(3*5)
+Crozier_max.edge <- 90
 print(Crozier_max.edge)
-# ~150 metres
+# 90 metres
 
 # expand outer layer
-Crozier_bound.outer = diff(range(st_coordinates(sf_Crozier)[,1]))/5
+Crozier_bound.outer <- 100
 print(Crozier_bound.outer)
-# ~450 metres
+# 180 metres
 
 # create Crozier mesh
-Crozier_mesh <- fm_mesh_2d(boundary = buff_boundary, # use buffered coastline as boundary
-                           max.edge = c(1,5)*Crozier_max.edge, # inner and outer max edge where outer layer has triangle density lower than inner
+Crozier_mesh <- fm_mesh_2d(boundary = buff_boundary,
+                           max.edge = c(1,3)*Crozier_max.edge,
                            offset = c(Crozier_max.edge, Crozier_bound.outer),
-                           cutoff = Crozier_max.edge/5,
+                           cutoff = 0.3,
                            crs = st_crs(sf_Crozier))
 print(Crozier_mesh$n)
 
@@ -70,8 +69,6 @@ mesh_plot_Crozier <- ggplot() +
 # geom_sf converts to degrees
 
 mesh_plot_Crozier
-
-# null LGCP
 
 # import guano area shapefile
 sf_Crozier_guano <- st_read("Crozier_2020_1_3031_guano.shp")
@@ -125,7 +122,6 @@ null_model <- lgcp(null_cmp, # formula
                      control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
                    )
 )
-# takes less than ~2 mins to run
 
 summary(null_model)
 
@@ -160,6 +156,65 @@ print(null_total_pred)
 # plot log intensity
 null_Intensity_plot <- ggplot() +
   geom_fm(data = Crozier_mesh) +
+  gg(null_lambda, geom = "tile")
+
+null_Intensity_plot
+
+# subdivide mesh
+# splits triangles into subtriangles
+mesh_sub <- fm_subdivide(Crozier_mesh,3)
+print(mesh_sub$n)
+
+# null model with mesh sub
+matern <- inla.spde2.pcmatern(mesh = mesh_sub,
+                              prior.range = c(1000, 0.5), 
+                              prior.sigma = c(1, 0.5)) 
+
+null_cmp <- geometry ~
+  Intercept(1) +
+  mySmooth(geometry, model = matern)
+
+print("running null model with 1000, 0.5 range prior and 1, 0.5 sigma prior and mesh sub 3")
+
+null_model <- lgcp(null_cmp, # formula
+                   data = sf_Crozier, # locations
+                   samplers = sf_Crozier_guano_buffered, # sample area
+                   domain = list(geometry = mesh_sub), # mesh
+                   options = list(
+                     control.inla = list(verbose = TRUE),
+                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
+                   )
+)
+
+summary(null_model)
+
+grid_pts <- fm_pixels(
+  mesh_sub,
+  format = "sf",
+  mask = sf_Crozier_guano_buffered
+)
+
+# predict intensity per m2
+null_lambda <- predict(
+  null_model,
+  grid_pts, # use this instead of fm_pixels
+  ~ exp(mySmooth + Intercept)
+)
+
+# cell spacing from the point coordinates
+coords <- st_coordinates(grid_pts)
+dx <- median(diff(sort(unique(coords[,1]))))
+dy <- median(diff(sort(unique(coords[,2]))))
+
+cell_area <- dx * dy  # m2 per pixel
+
+# multiply and sum
+null_total_pred <- sum(null_lambda$mean * cell_area)
+print(null_total_pred)
+
+# plot log intensity
+null_Intensity_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
   gg(null_lambda, geom = "tile")
 
 null_Intensity_plot
@@ -237,67 +292,6 @@ cov_stack <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_rast
 cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
 
 cor(cov_values)
-
-# subdivide mesh
-# splits triangles into subtriangles
-mesh_sub <- fm_subdivide(Crozier_mesh,3)
-print(mesh_sub$n)
-
-# null model with mesh sub
-matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(1000, 0.5), 
-                              prior.sigma = c(1, 0.5)) 
-
-null_cmp <- geometry ~
-  Intercept(1) +
-  mySmooth(geometry, model = matern)
-
-print("running null model with 1000, 0.5 range prior and 1, 0.5 sigma prior and mesh sub 3")
-
-null_model <- lgcp(null_cmp, # formula
-                   data = sf_Crozier, # locations
-                   samplers = sf_Crozier_guano_buffered, # sample area
-                   domain = list(geometry = mesh_sub), # mesh
-                   options = list(
-                     control.inla = list(verbose = TRUE),
-                     control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
-                   )
-)
-
-summary(null_model)
-
-grid_pts <- fm_pixels(
-  mesh_sub,
-  format = "sf",
-  mask = sf_Crozier_guano_buffered
-)
-
-# predict intensity per m2
-null_lambda <- predict(
-  null_model,
-  grid_pts, # use this instead of fm_pixels
-  ~ exp(mySmooth + Intercept)
-)
-
-# cell spacing from the point coordinates
-coords <- st_coordinates(grid_pts)
-dx <- median(diff(sort(unique(coords[,1]))))
-dy <- median(diff(sort(unique(coords[,2]))))
-
-cell_area <- dx * dy  # m2 per pixel
-
-# multiply and sum
-null_total_pred <- sum(null_lambda$mean * cell_area)
-print(null_total_pred)
-
-# plot log intensity
-null_Intensity_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(null_lambda, geom = "tile")
-
-null_Intensity_plot
-
-# covariates
 
 # need to adjust prior range as spatial autocorrelation wont be explaining as much
 
