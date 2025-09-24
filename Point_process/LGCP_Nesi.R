@@ -5,7 +5,8 @@
 # set working directory
 # path to the data
 #setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
-setwd("D:/Points_test/LGCP_nesi_data")
+#setwd("E:/Points_test/LGCP_nesi_data")
+setwd("D:/PhD_Chap1_part2/LGCP_nesi_data")
 
 # load packages 
 library(sf)
@@ -48,7 +49,7 @@ print(Crozier_max.edge)
 # expand outer layer
 Crozier_bound.outer <- 100
 print(Crozier_bound.outer)
-# 180 metres
+# 100 metres
 
 # create Crozier mesh
 Crozier_mesh <- fm_mesh_2d(boundary = buff_boundary,
@@ -188,6 +189,7 @@ null_model <- lgcp(null_cmp, # formula
 
 summary(null_model)
 
+# make prediction grid as sf points
 grid_pts <- fm_pixels(
   mesh_sub,
   format = "sf",
@@ -295,12 +297,12 @@ cor(cov_values)
 
 # need to adjust prior range as spatial autocorrelation wont be explaining as much
 
-# SPDE priors
+# GA SPDE priors
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(25, 0.9), 
-                              prior.sigma = c(0.1, 0.01))
+                              prior.range = c(100, 0.9), 
+                              prior.sigma = c(1, 0.5))
 
-print("running guano model with 25, 0.9 range prior and 0.1, 0.01 sigma prior and mesh sub 3")
+print("running guano model with 100, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 3")
 
 G_cmp <- geometry ~
   Intercept(1) + 
@@ -353,6 +355,12 @@ G_Intensity_plot <- ggplot() +
   gg(G_lambda, geom = "tile")
 
 G_Intensity_plot
+
+# GS SPDE priors
+matern <- inla.spde2.pcmatern(mesh = mesh_sub,
+                              prior.range = c(25, 0.9), 
+                              prior.sigma = c(0.1, 0.01))
+
 
 print("running GS model with 25, 0.9 range prior and 0.1, 0.01 sigma prior and mesh sub 3")
 
