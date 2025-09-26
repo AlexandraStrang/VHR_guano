@@ -164,11 +164,11 @@ print(mesh_sub$n)
 
 # SPDE priors
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(25, 0.9), 
-                              prior.sigma = c(0.1, 0.01))
+                              prior.range = c(100, 0.9), 
+                              prior.sigma = c(1, 0.5))
 
-print("running guano model with 25, 0.9 range prior and 0.1, 0.01 sigma prior and mesh sub 6")
-print("fixed effects: mean 0 and prec 1")
+print("running guano model with 100, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 6")
+print("fixed effects: mean 0 and prec 0.1")
 
 G_cmp <- geometry ~
   Intercept(1) + 
@@ -185,9 +185,9 @@ G_model <- lgcp(G_cmp, # formula
                   control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE),
                   control.fixed = list(
                     mean.intercept = 0,
-                    prec.intercept = 1,
+                    prec.intercept = 0.1,
                     mean = c(0),
-                    prec = c(1)
+                    prec = c(0.1)
                   )
                 )
 )
@@ -234,8 +234,13 @@ ggsave(file.path(m9_path, "G_Intensity_plot.png"), G_Intensity_plot,
        width = 8, height = 5, units = "in", 
        dpi = 600)
 
-print("running GS model with 100, 0.9 range prior and 0.1, 0.01 sigma prior and mesh sub 6")
-print("fixed effects: mean 0 and prec 1")
+# SPDE priors
+matern <- inla.spde2.pcmatern(mesh = mesh_sub,
+                              prior.range = c(25, 0.9), 
+                              prior.sigma = c(0.1, 0.01))
+
+print("running GS model with 25, 0.9 range prior and 0.1, 0.01 sigma prior and mesh sub 6")
+print("fixed effects: mean 0 and prec 0.1")
 
 # Guano and slope
 GS_cmp <- geometry ~
@@ -251,9 +256,9 @@ GS_model <- lgcp(GS_cmp, # formula
                  options = list(
                    control.fixed = list(
                      mean.intercept = 0,
-                     prec.intercept = 1,
+                     prec.intercept = 0.1,
                      mean = c(0,0),
-                     prec = c(1,1)
+                     prec = c(0.1,0.1)
                    )
                  )
 )
