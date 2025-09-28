@@ -80,7 +80,7 @@ mesh_plot_Crozier <- ggplot() +
 
 mesh_plot_Crozier
 
-ggsave(file.path(m12_path, "mesh_plot_crozier.png"), mesh_plot_crozier, 
+ggsave(file.path(m12_path, "mesh_plot_crozier.png"), mesh_plot_Crozier, 
        width = 8, height = 5, units = "in", 
        dpi = 600)
 
@@ -107,7 +107,7 @@ GA_plot_Crozier <- ggplot() +
 
 GA_plot_Crozier
 
-ggsave(file.path(m12_path, "GA_plot_crozier.png"), GA_plot_crozier, 
+ggsave(file.path(m12_path, "GA_plot_crozier.png"), GA_plot_Crozier, 
        width = 8, height = 5, units = "in", 
        dpi = 600)
 
