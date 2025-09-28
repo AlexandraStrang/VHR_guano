@@ -266,6 +266,13 @@ hist(filtered_vals,
 
 plot(percent_guano_raster)
 
+# upscale rasters to 10m res
+percent_guano_raster <- aggregate(percent_guano_raster, fact = 5, fun = mean)
+slope_raster <- aggregate(slope_raster, fact = 5, fun = mean)
+aspect_raster <- aggregate(aspect_raster, fact = 5, fun = mean)
+roughness_raster <- aggregate(roughness_raster, fact = 5, fun = mean)
+TRI_raster <- aggregate(TRI_raster, fact = 5, fun = mean)
+
 # scale
 # (mean of 0 sd of 1)
 standardize <- function(r) {
@@ -284,6 +291,9 @@ TRI_raster       <- standardize(TRI_raster)
 hist(percent_guano_raster)
 summary(percent_guano_raster)
 
+# have to run this again
+percent_guano_raster[is.na(percent_guano_raster)] <- 0
+
 # check for misalignment
 covariate_plot <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
 plot(covariate_plot)
@@ -299,10 +309,10 @@ cor(cov_values)
 
 # GA SPDE priors
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(100, 0.9), 
+                              prior.range = c(50, 0.9), 
                               prior.sigma = c(1, 0.5))
 
-print("running guano model with 100, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 3")
+print("running guano model with 50, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 3")
 
 G_cmp <- geometry ~
   Intercept(1) + 
