@@ -273,6 +273,9 @@ aspect_raster <- aggregate(aspect_raster, fact = 5, fun = mean)
 roughness_raster <- aggregate(roughness_raster, fact = 5, fun = mean)
 TRI_raster <- aggregate(TRI_raster, fact = 5, fun = mean)
 
+print(res(percent_guano_raster))
+print(res(slope_raster))
+
 # scale
 # (mean of 0 sd of 1)
 standardize <- function(r) {
@@ -309,10 +312,10 @@ cor(cov_values)
 
 # GA SPDE priors
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
-                              prior.range = c(50, 0.9), 
+                              prior.range = c(100, 0.9), 
                               prior.sigma = c(1, 0.5))
 
-print("running guano model with 50, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 3")
+print("running guano model with 100, 0.9 range prior and 1, 0.5 sigma prior and mesh sub 3")
 
 G_cmp <- geometry ~
   Intercept(1) + 
@@ -370,7 +373,6 @@ G_Intensity_plot
 matern <- inla.spde2.pcmatern(mesh = mesh_sub,
                               prior.range = c(25, 0.9), 
                               prior.sigma = c(0.1, 0.01))
-
 
 print("running GS model with 25, 0.9 range prior and 0.1, 0.01 sigma prior and mesh sub 3")
 
