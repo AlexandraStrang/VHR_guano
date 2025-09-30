@@ -3,9 +3,6 @@
 # created: 2025
 
 # set working directory
-# path to the data
-#setwd("/home/stranga/00_nesi_projects/landcare04225/Alexandra_Data/point_process_data/LGCP_nesi_data")
-#setwd("E:/Points_test/LGCP_nesi_data")
 setwd("D:/PhD_Chap1_part2/LGCP_nesi_data")
 
 # load packages 
@@ -13,11 +10,12 @@ library(sf)
 library(fmesher)
 library(ggplot2)
 library(INLA) # version 25.09.04
-library(inlabru) # version 2.13.0 (update)
+library(inlabru) # version 2.13.0 (update?)
 library(dplyr)
 library(purrr)
 library(tidyr)
 library(terra) # for rasters
+library(ggpubr)
 
 bru_options_set(control.compute = list(cpo = TRUE))
 
@@ -151,10 +149,8 @@ plot(covariate_plot)
 cov_stack <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
 
 # use inlabru to handle abundance model (positive integer response)
-
 # species counts are recorded at each observed location
 # the count model is a coarse aggregation of point process model
-
 # rasterise the species counts to match the spatial covariates
 # mask the regions outside of the study area (buff coastline boundary)
 
@@ -164,13 +160,14 @@ count_raster <-
   terra::aggregate(fact = 5, fun = sum) %>%
   mask(vect(sf::st_geometry(buff_boundary)))
 
+# counts of nests
 plot(count_raster)
 
 count_raster <- count_raster %>%
   cellSize(unit = "m") %>%
   c(count_raster)
 
-res(count_raster)
+res(count_raster) # 10 x 10 m
 summary(count_raster)
 # 149 penguins in 100 m2
 
@@ -204,17 +201,18 @@ ggplot() +
 # Poisson GLM
 # Poisson model that links species counts per raster cell to spatial covariates
 
-cmps <- ~ percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
+cmps <- ~ Intercept(1) +
+  percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
   slope(cov_stack$Cape_Crozier_slope, model = "linear") +
-  field(geometry, model = matern) + Intercept(1)
+  field(geometry, model = matern)
 
 fit_poi <- bru(
   cmps,
   bru_obs(
     family = "poisson", data = counts_df,
-    formula = count ~
+    formula = count ~ Intercept +
       percentguano + slope +
-      field + Intercept,
+      field,
     E = area
   )
 )
@@ -240,14 +238,80 @@ expect_poi <- pred_poi$expect
 expect_poi$pred_var <- expect_poi$mean + expect_poi$sd^2
 expect_poi$log_score <- -log(pred_poi$obs_prob$mean)
 
+# predict abundance
 predicted_abundance <- sum(expect_poi$mean)
 
+# plot intensity
 ggplot() +
   geom_fm(data = mesh_sub) +
   gg(expect_poi, aes(fill = mean / area), geom = "tile") +
   #geom_sf(data = sf_Crozier, color = "red", size = 1, pch = 4, alpha = 0.2) +
   ggtitle("Nest intensity per ~ m")
 
-# ZIP model?
-# Zero-Inflated Poisson model
+# plot resids
+counts_df$residual <- counts_df$count - expect_poi$mean
+
+resids <- ggplot(counts_df, aes(x = expect_poi$mean, y = residual)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Residuals vs Expected Abundance",
+       x = "Expected Abundance",
+       y = "Residual (Observed - Expected)")
+
+resids
+
+# plot PIT
+pit <- fit_poi$cpo$pit * c(NA_real_, 1)[1 + (counts_df$count > 0)]
+counts_df$pit <- pit
+
+ggplot(counts_df, aes(x = pit)) +
+  stat_ecdf(na.rm = TRUE) +
+  scale_x_continuous(expand = c(0, 0)) +
+  ggtitle("PIT ECDF Plot") +
+  xlab("PIT") +
+  ylab("ecdf")
+
+# plot posterior predicted abundance
+expect_poi <- pred_poi$expect
+
+ggplot(expect_poi, aes(x = 1:nrow(expect_poi), y = mean)) +
+  geom_line(color = "blue") +
+  geom_ribbon(aes(ymin = mean - 1.96 * sd, ymax = mean + 1.96 * sd), alpha = 0.3) +
+  labs(title = "Posterior Predicted Abundance",
+       x = "Grid cell",
+       y = "Mean Predicted Abundance") +
+  scale_y_continuous(limits = c(-100, 250), breaks = seq(-100, 250, by=50))
+
+# plot posterior mean, sd, 95% CI for fixed effects
+
+
+fixed_effects <- data.frame(
+  effect = fit_poi$names.fixed,
+  mean = fit_poi$summary.fixed$mean,
+  lower = fit_poi$summary.fixed$`0.025quant`,
+  upper = fit_poi$summary.fixed$`0.975quant`,
+  sd = fit_poi$summary.fixed$sd
+)
+
+ggplot(fixed_effects, aes(x = mean, y = effect)) +
+  geom_point(size = 3, color = "black") +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.2, color = "gray40") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+  labs(
+    title = "Posterior Means and 95% Credible Intervals",
+    x = "Estimate",
+    y = "Fixed Effect"
+  ) +
+  theme_minimal()
+
+# table
+summary_table <- fixed_effects %>%
+  group_by(effect) %>%
+  summarise(mean = mean,
+            lower = lower,
+            upper = upper,
+            sd = sd)
+
+table_plot <- ggtexttable(summary_table, rows = NULL)
+plot(table_plot)
 
