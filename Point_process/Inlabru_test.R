@@ -248,49 +248,6 @@ ggplot() +
   #geom_sf(data = sf_Crozier, color = "red", size = 1, pch = 4, alpha = 0.2) +
   ggtitle("Nest intensity per ~ m")
 
-# add covariates to cell raster
-
-# Extract covariate values from aggregated cov_stack into counts_df
-cov_values <- terra::extract(cov_stack, vect(counts_df))[, -1]
-counts_df <- bind_cols(counts_df, cov_values)
-
-# compute cell area from covariate raster
-area_raster <- terra::cellSize(cov_stack[[1]], unit = "m")
-
-# extract area values to prediction grid
-area_vals <- terra::extract(area_raster, vect(pred_grid))[,2]
-pred_grid$area <- area_vals
-
-pred_map <- predict(
-  fit_poi, pred_grid,
-  ~{
-    expect <- exp(percentguano +
-                    slope +
-                    field + Intercept
-    ) * area
-    list(
-      expect = expect
-    )
-  },
-  n.samples = 1000
-)
-
-pred_grid$expected_abundance <- pred_map$expect$mean
-pred_raster <- terra::rasterize(vect(pred_grid), cov_stack, field = "expected_abundance")
-plot(pred_raster)
-
-total_abundance <- sum(pred_map$expect$mean, na.rm = TRUE)
-
-
-pred_grid$linear_predictor <- pred_map$percentguano +
-  pred_map$slope +
-  pred_map$field +
-  pred_map$Intercept
-
-hist(pred_grid$linear_predictor)
-
-
-
 # ZIP model?
 # Zero-Inflated Poisson model
 
