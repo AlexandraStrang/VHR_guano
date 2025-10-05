@@ -3,7 +3,7 @@
 # created: 2025
 
 # set working directory
-setwd("D:/PhD_Chap1_part2/LGCP_nesi_data")
+setwd("C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
 
 # load packages 
 library(sf)
@@ -201,13 +201,13 @@ ggplot() +
 # Poisson GLM
 # Poisson model that links species counts per raster cell to spatial covariates
 
-cmps <- ~ Intercept(1) +
+GS_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
   slope(cov_stack$Cape_Crozier_slope, model = "linear") +
   field(geometry, model = matern)
 
-fit_poi <- bru(
-  cmps,
+GS_model <- bru(
+  GS_cmp,
   bru_obs(
     family = "poisson", data = counts_df,
     formula = count ~ Intercept +
@@ -217,15 +217,14 @@ fit_poi <- bru(
   )
 )
 
-summary(fit_poi)
+summary(GS_model)
 
-pred_poi <- predict(
-  fit_poi, counts_df,
+GS_pred <- predict(
+  GS_model, counts_df,
   ~{
-    expect <- exp(percentguano +
-                    slope +
-                    field + Intercept
-                  ) * area
+    expect <- exp(Intercept + 
+                    percentguano + slope +
+                    field) * area
     list(
       expect = expect,
       obs_prob = dpois(count, expect)
@@ -234,9 +233,9 @@ pred_poi <- predict(
   n.samples = 1000
 )
 
-expect_poi <- pred_poi$expect
+expect_poi <- GS_pred$expect
 expect_poi$pred_var <- expect_poi$mean + expect_poi$sd^2
-expect_poi$log_score <- -log(pred_poi$obs_prob$mean)
+expect_poi$log_score <- -log(GS_pred$obs_prob$mean)
 
 # predict abundance
 predicted_abundance <- sum(expect_poi$mean)
@@ -261,7 +260,7 @@ resids <- ggplot(counts_df, aes(x = expect_poi$mean, y = residual)) +
 resids
 
 # plot PIT
-pit <- fit_poi$cpo$pit * c(NA_real_, 1)[1 + (counts_df$count > 0)]
+pit <- GS_model$cpo$pit * c(NA_real_, 1)[1 + (counts_df$count > 0)]
 counts_df$pit <- pit
 
 ggplot(counts_df, aes(x = pit)) +
@@ -272,7 +271,7 @@ ggplot(counts_df, aes(x = pit)) +
   ylab("ecdf")
 
 # plot posterior predicted abundance
-expect_poi <- pred_poi$expect
+expect_poi <- GS_pred$expect
 
 ggplot(expect_poi, aes(x = 1:nrow(expect_poi), y = mean)) +
   geom_line(color = "blue") +
@@ -286,11 +285,11 @@ ggplot(expect_poi, aes(x = 1:nrow(expect_poi), y = mean)) +
 
 
 fixed_effects <- data.frame(
-  effect = fit_poi$names.fixed,
-  mean = fit_poi$summary.fixed$mean,
-  lower = fit_poi$summary.fixed$`0.025quant`,
-  upper = fit_poi$summary.fixed$`0.975quant`,
-  sd = fit_poi$summary.fixed$sd
+  effect = GS_model$names.fixed,
+  mean = GS_model$summary.fixed$mean,
+  lower = GS_model$summary.fixed$`0.025quant`,
+  upper = GS_model$summary.fixed$`0.975quant`,
+  sd = GS_model$summary.fixed$sd
 )
 
 ggplot(fixed_effects, aes(x = mean, y = effect)) +
@@ -314,4 +313,7 @@ summary_table <- fixed_effects %>%
 
 table_plot <- ggtexttable(summary_table, rows = NULL)
 plot(table_plot)
+
+# partial predictions to check guano
+
 
