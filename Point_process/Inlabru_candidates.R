@@ -4,17 +4,20 @@
 
 # set working directory
 setwd("C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
+setwd(setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data"))
 
 # load packages 
 library(sf)
 library(fmesher)
 library(ggplot2)
-library(INLA) # version 25.09.04
+library(INLA) # version 25.09.19
 library(inlabru) # for lgcp() version 2.13.0
 library(dplyr)
 library(purrr)
 library(tidyr)
 library(terra) # for rasters
+
+bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
 
 # sessionInfo() - important to note r version and versions of inlabru, INLA, fmesher
 # R version 4.5.0 (2025-04-11 ucrt)
@@ -29,7 +32,11 @@ Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
 sf_Crozier <- st_as_sf(Crozier_xy, coords = c("x", "y"), crs = 3031)
 st_crs(sf_Crozier)
 
-# load in mesh parameters
+##############################################################################################
+
+# mesh
+
+##############################################################################################
 
 # import Crozier coastline boundary
 sf_Crozier_boundary <- st_read("Crozier_boundary.shp")
@@ -63,7 +70,11 @@ print(Crozier_mesh$n)
 mesh_sub <- fm_subdivide(Crozier_mesh,3)
 print(mesh_sub$n)
 
-# load in covariates
+##############################################################################################
+
+# covariates
+
+##############################################################################################
 
 # add covariates at 2m res (aggregated below)
 
@@ -152,6 +163,14 @@ counts_df <- crds(count_raster, df = TRUE, na.rm = TRUE) %>%
 # aggregate covariates to match count raster
 cov_stack <- terra::aggregate(cov_stack, fact = 5, fun = mean)
 
+##############################################################################################
+
+# run models
+
+##############################################################################################
+
+set.seed(28)
+
 # add matern function 
 
 # SPDE priors
@@ -169,10 +188,6 @@ matern <- inla.spde2.pcmatern(mesh = mesh_sub,
 # GTA - percent guano + TRI + aspect
 # GA - percent guano + aspect
 # N - Null model (spatial field only)
-
-# Null model
-N_cmp
-N_model
 
 # Guano model
 G_cmp <- ~ Intercept(1) +
@@ -192,6 +207,8 @@ G_model <- bru(
 
 summary(G_model)
 
+saveRDS(G_model, file = "Inlabru_outputs/G_model.rds")
+
 # Guano + slope model
 GS_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
@@ -210,6 +227,8 @@ GS_model <- bru(
 )
 
 summary(GS_model)
+
+saveRDS(GS_model, file = "Inlabru_outputs/GS_model.rds")
 
 # Guano + slope + aspect model
 GSA_cmp <- ~ Intercept(1) +
@@ -231,6 +250,8 @@ GSA_model <- bru(
 
 summary(GSA_model)
 
+saveRDS(GSA_model, file = "Inlabru_outputs/GSA_model.rds")
+
 # Guano + roughness model
 GR_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
@@ -249,6 +270,8 @@ GR_model <- bru(
 )
 
 summary(GR_model)
+
+saveRDS(GR_model, file = "Inlabru_outputs/GR_model.rds")
 
 # Guano + roughness + aspect model
 GRA_cmp <- ~ Intercept(1) +
@@ -270,6 +293,8 @@ GRA_model <- bru(
 
 summary(GRA_model)
 
+saveRDS(GRA_model, file = "Inlabru_outputs/GRA_model.rds")
+
 # Guano + TRI model
 GT_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
@@ -288,6 +313,8 @@ GT_model <- bru(
 )
 
 summary(GT_model)
+
+saveRDS(GT_model, file = "Inlabru_outputs/GT_model.rds")
 
 # Guano + TRI + aspect model
 GTA_cmp <- ~ Intercept(1) +
@@ -309,6 +336,8 @@ GTA_model <- bru(
 
 summary(GTA_model)
 
+saveRDS(GTA_model, file = "Inlabru_outputs/GTA_model.rds")
+
 # Guano + aspect model
 GA_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
@@ -328,4 +357,359 @@ GA_model <- bru(
 # aspect has some NAs
 
 summary(GA_model)
+
+saveRDS(GA_model, file = "Inlabru_outputs/GA_model.rds")
+
+# Null model
+N_cmp <- ~ Intercept(1) +
+  field(geometry, model = matern)
+
+N_model <- bru(
+  N_cmp,
+  bru_obs(
+    family = "poisson", data = counts_df,
+    formula = count ~ Intercept +
+      field,
+    E = area
+  )
+)
+
+summary(N_model)
+
+saveRDS(N_model, file = "Inlabru_outputs/N_model.rds")
+
+##############################################################################################
+
+# predictions
+
+##############################################################################################
+
+# G model predictions
+G_pred <- predict(
+  G_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + 
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+G_expected <- G_pred$expect
+G_expected$pred_var <- G_expected$mean + G_expected$sd^2
+G_expected$log_score <- -log(G_pred$obs_prob$mean)
+
+G_abundance <- sum(G_expected$mean)
+
+# GS model predictions
+GS_pred <- predict(
+  GS_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + slope +
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+GS_expected <- GS_pred$expect
+GS_expected$pred_var <- GS_expected$mean + GS_expected$sd^2
+GS_expected$log_score <- -log(GS_pred$obs_prob$mean)
+
+GS_abundance <- sum(GS_expected$mean)
+
+# GSA model predictions
+GSA_pred <- predict(
+  GSA_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + slope + aspect +
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+GSA_expected <- GSA_pred$expect
+GSA_expected$pred_var <- GSA_expected$mean + GSA_expected$sd^2
+GSA_expected$log_score <- -log(GSA_pred$obs_prob$mean)
+
+GSA_abundance <- sum(GSA_expected$mean)
+
+# GR model predictions
+GR_pred <- predict(
+  GR_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + roughness +
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+GR_expected <- GR_pred$expect
+GR_expected$pred_var <- GR_expected$mean + GR_expected$sd^2
+GR_expected$log_score <- -log(GR_pred$obs_prob$mean)
+
+GR_abundance <- sum(GR_expected$mean)
+
+# GRA model predictions
+GRA_pred <- predict(
+  GRA_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + roughness + aspect +
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+GRA_expected <- GRA_pred$expect
+GRA_expected$pred_var <- GRA_expected$mean + GRA_expected$sd^2
+GRA_expected$log_score <- -log(GRA_pred$obs_prob$mean)
+
+GRA_abundance <- sum(GRA_expected$mean)
+
+# GT model predictions
+GT_pred <- predict(
+  GT_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + TRI +
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+GT_expected <- GT_pred$expect
+GT_expected$pred_var <- GT_expected$mean + GT_expected$sd^2
+GT_expected$log_score <- -log(GT_pred$obs_prob$mean)
+
+GT_abundance <- sum(GT_expected$mean)
+
+# GTA model predictions
+GTA_pred <- predict(
+  GTA_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + TRI + aspect +
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+GTA_expected <- GTA_pred$expect
+GTA_expected$pred_var <- GTA_expected$mean + GTA_expected$sd^2
+GTA_expected$log_score <- -log(GTA_pred$obs_prob$mean)
+
+GTA_abundance <- sum(GTA_expected$mean)
+
+# GA model predictions
+GA_pred <- predict(
+  GA_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano + aspect +
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+GA_expected <- GA_pred$expect
+GA_expected$pred_var <- GA_expected$mean + GA_expected$sd^2
+GA_expected$log_score <- -log(GA_pred$obs_prob$mean)
+
+GA_abundance <- sum(GA_expected$mean)
+
+# N model predictions
+N_pred <- predict(
+  N_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    field) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+N_expected <- N_pred$expect
+N_expected$pred_var <- N_expected$mean + N_expected$sd^2
+N_expected$log_score <- -log(N_pred$obs_prob$mean)
+
+N_abundance <- sum(N_expected$mean)
+
+
+##############################################################################################
+
+# summary statistics (WAIC, DIC, Marginal log-Likelihood)
+
+##############################################################################################
+
+model_list <- c(G_model, 
+                GS_model,
+                GSA_model,
+                GR_model,
+                GRA_model,
+                GT_model,
+                GTA_model,
+                GA_model,
+                N_model
+                )
+
+pred_list <- list(G_pred,
+                  GS_pred,
+                  GSA_pred,
+                  GR_pred,
+                  GRA_pred,
+                  GT_pred,
+                  GTA_pred,
+                  GA_pred,
+                  N_pred
+)
+
+saveRDS(pred_list, file = "Inlabru_outputs/pred_list.rds")
+
+# loop through models
+for (i in model_list) {
+  model <- i
+  
+  # NOT WORKING
+  
+  fixed_effects <- model$names.fixed
+  
+  print(fixed_effects)
+  
+  # grab summary statistics
+  Intercept_mean <- model$summary.fixed$mean[1]
+  Intercept_sd <- model$summary.fixed$sd[1]
+  Intercept_0.025 <- model$summary.fixed$`0.025quant`[1]
+  Intercept_0.975 <- model$summary.fixed$`0.975quant`[1]
+  
+  # grab diagnostic statistics
+  WAIC <- model$waic$waic
+  DIC <- model$dic$dic
+  MLik <- model$mlik[2]
+}
+
+
+# table of predictions
+
+
+# plot predictions
+G_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(G_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/G_predictions.png", G_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+       )
+
+GS_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GS_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/GS_predictions.png", GS_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GSA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GSA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/GSA_predictions.png", GSA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GR_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GR_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/GR_predictions.png", GR_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GRA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GRA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/GRA_predictions.png", GRA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GT_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GT_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/GT_predictions.png", GT_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GTA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GTA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/GTA_predictions.png", GTA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/GA_predictions.png", GA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+N_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(N_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per ~ m")
+ggsave("Inlabru_outputs/N_predictions.png", N_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+) # shows up with nothing
+
+# Plot residuals
 
