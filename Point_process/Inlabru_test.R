@@ -201,6 +201,7 @@ ggplot() +
 # Poisson GLM
 # Poisson model that links species counts per raster cell to spatial covariates
 
+# try guano and slope first
 GS_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
   slope(cov_stack$Cape_Crozier_slope, model = "linear") +
