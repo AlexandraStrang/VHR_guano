@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 1.0 Document set up
 
+NEEDS UPDATING (OCT 2025)
+
 This document outlines the analysis part of "Intra-seasonal variation and factors influencing satellite-derived population indices of Ad\'{e}lie penguins (*Pygoscelis adeliae*) in the Ross Sea", the first data chapter of Alexandra Strang's doctoral thesis. This document focuses on the first question of this chapter: Is there a pattern in the size of the guano stain within a breeding season, as estimated through satellite imagery? With this question, we aimed to test the assumption that guano area estimates from images taken anywhere between December and February are equivalent. We hypothesised that the size of guano stain observed in VHR imagery will increase as the movement of birds throughout the colony increases as the season progresses. We also aimed to investigate the influence of satellite-related factors on the variability of guano area estimates within a single breeding season. We analysed the change in guano area within a season and the rate of change, where a trend in guano area size indicates that seasonal variation in guano area needs to be accounted for when deriving population estimates from VHR imagery. This will insure accurate comparisons of colony size between different years.
 
 All data scripts can be found at {INSERT GITHUB LINK to VHR_guano repo}
