@@ -2,6 +2,15 @@
 # creator: Alexandra Strang
 # created: 2025
 
+# Load packages
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+library(corrplot)
+library(car) # for VIF values
+library(nlme) # Use REML for low sample sizes
+library(performance) # can't use vif for lmm
+
 # Read in data
 Dataset.1.0 <- read.csv("Merged_masterdata.csv")
 
@@ -13,7 +22,7 @@ colours <- c("darkblue","royalblue","skyblue")
 ##########################################################################
 
 # Extract only within season data and needed variables 
-Dataset.1.1 <- Dataset.1.0[,c("Colony_code","Analysis","Season","Date",
+Dataset.1.1 <- Dataset.1.0[,c("Colony_name","Colony_code","Analysis","Season","Date",
 "GA","MEANCOLLECTEDGSD","MEANSUNAZ","MEANSUNEL","MEANOFFNADIRVIEWANGLE")]
 
 # Keep only intra-seaonal data
@@ -25,7 +34,7 @@ sum(is.na(Dataset.1.1$Analysis))
 Dataset.1.2 <- na.omit(Dataset.1.1)
 
 # Condense/ remove analysis column
-Dataset.1.3 <- Dataset.1.2[,c("Colony_code","Season","Date","GA",
+Dataset.1.3 <- Dataset.1.2[,c("Colony_name","Colony_code","Season","Date","GA",
 "MEANCOLLECTEDGSD","MEANSUNAZ","MEANSUNEL","MEANOFFNADIRVIEWANGLE")]
 
 # View
@@ -48,11 +57,14 @@ Dataset.1.3$Day_D1 <- as.numeric(difftime(Dataset.1.3$r_date,
 # Days since December 1st: numerical but discrete without decimals 
 
 # Condense/ remove r date column
-Dataset.1.4 <- Dataset.1.3[,c("Colony_code","Season","Date","GA", "Day_D1",
+Dataset.1.4 <- Dataset.1.3[,c("Colony_name","Colony_code","Season","Date","GA", "Day_D1",
 "MEANCOLLECTEDGSD","MEANSUNAZ","MEANSUNEL","MEANOFFNADIRVIEWANGLE")]
 
 # View
 View(Dataset.1.4)
+
+# Change colony_name to colony for figures
+Dataset.1.4$Colony <- Dataset.1.4$Colony_name
 
 ##########################################################################
 # Visualise within season data by colony across time
@@ -64,8 +76,6 @@ CROZdf <- subset(Dataset.1.4, Dataset.1.4$Colony_code=="CROZ")
 HALLdf <- subset(Dataset.1.4, Dataset.1.4$Colony_code=="HALL")
 
 # Plot guano areas over time from days since December 1st for each colony
-
-library(ggplot2)
 
 # Adare
 ADAR_plot <- ggplot(ADARdf, aes(x = Day_D1, y = GA)) +
@@ -116,9 +126,6 @@ HALL_plot <- ggplot(HALLdf, aes(x = Day_D1, y = GA)) +
 HALL_plot
 
 # Plot together
-
-library(ggpubr)
-
 All_3_plot <- plot(ggarrange(ADAR_plot,
                               CROZ_plot,
                               HALL_plot,
@@ -195,14 +202,19 @@ All_3_plot <- plot(ggarrange(ADAR_plot2,
                              nrow = 3,
                              labels = c("Cape Adare", "Cape Crozier", "Cape Hallett"),
                              label.x = 0.1))
-annotate_figure(All_3_plot, left = "Log guano area (m2)", bottom = "Days since December 1st")
+All_3_plot <- annotate_figure(All_3_plot, left = "Log guano area (m²)", bottom = "Days since December 1st")
+
+# Figure 3 of Chap 1
+ggsave("Chap1_outputs/Seasonal_GA_by_colony.png", All_3_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600)
 
 # View on the same plot
 All_together <- ggplot(Dataset.1.4, aes(x = Day_D1, y = Log_GA, group = Colony_code)) +
   geom_point(aes(colour = Colony_code)) +
   geom_line(aes(colour = Colony_code)) +
   xlab("Days since December 1st") +
-  ylab("Log guano area (m2)") +
+  ylab("Log guano area (m²)") +
   theme_minimal() +
   theme(axis.line = element_line(colour = 'black'),
         plot.background = element_blank(),
@@ -213,12 +225,11 @@ All_together <- ggplot(Dataset.1.4, aes(x = Day_D1, y = Log_GA, group = Colony_c
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
 All_together
-# Figure 3 of Chap 1
 
 # Differences between and within colonies (means and standard deviations)
 
 # Plot as box plot
-Box_plot <- ggplot(Dataset.1.4, aes(x = Colony_code, y = Log_GA, fill = Colony_code)) +
+Box_plot <- ggplot(Dataset.1.4, aes(x = Colony, y = Log_GA, fill = Colony)) +
   geom_boxplot() +
   xlab("Colony") +
   ylab("Log guano area (m²)") +
@@ -227,18 +238,23 @@ Box_plot <- ggplot(Dataset.1.4, aes(x = Colony_code, y = Log_GA, fill = Colony_c
         plot.background = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        panel.border = element_blank()) +
+        panel.border = element_blank(),
+        legend.position = "none"
+        ) +
   scale_fill_manual(values = colours)
 
 Box_plot
+
 # Figure 4 of Chap 1
+ggsave("Chap1_outputs/Seasonal_GA_boxplot.png", Box_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600)
 
 # Calculate means and standard deviations for each colony
-library(dplyr)
 
 # Create table
 summary_table <- Dataset.1.4 %>%
-  group_by(Colony_code, Season) %>%
+  group_by(Colony, Season) %>%
   summarise(n = n(),
             mean_GA = mean(GA),
             median_GA = median(GA),
@@ -257,8 +273,6 @@ plot(table_plot)
 ##########################################################################
 
 # Investigate correlation between covariates using correlogram
-library(corrplot)
-
 covariates <- data.frame(Dataset.1.4$Day_D1, Dataset.1.4$MEANCOLLECTEDGSD,Dataset.1.4$MEANSUNEL, 
                          Dataset.1.4$MEANSUNAZ, Dataset.1.4$MEANOFFNADIRVIEWANGLE)
 
@@ -275,15 +289,15 @@ corrplot(cor.matrix, method = "number", type = "lower", tl.cex = 1)
 # Build base model with satellite-related factors
 ##########################################################################
 
-library(car) # for VIF values
-
 # non-log base model without random effect of colony
 base_model <- lm(Dataset.1.4$GA ~ Dataset.1.4$Day_D1 + Dataset.1.4$MEANCOLLECTEDGSD + 
                    Dataset.1.4$MEANSUNAZ + Dataset.1.4$MEANSUNEL +
                    Dataset.1.4$MEANOFFNADIRVIEWANGLE)
-# too many parameters for observations
-summary(base_model)
-vif(base_model) # based on vif remove sun elevation?
+
+summary(base_model) # too many parameters for the no. of observations
+
+# Day since Dec 1 is an integer = not continuous
+vif(base_model) # based on vif remove SUNEL or Day_D1
 
 # check residuals
 par(mfrow = c(2,2))
@@ -291,8 +305,6 @@ plot(base_model)
 
 Dataset.1.4$fittedbase <- fitted(base_model)
 Dataset.1.4$residbase <- resid(base_model)
-
-library(ggplot2)
 
 Resids_base <- ggplot(Dataset.1.4, aes(x=fittedbase, y=residbase, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
@@ -318,7 +330,7 @@ log_base_model <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$Day_D1 + Dataset.1.4$MEANC
                    Dataset.1.4$MEANOFFNADIRVIEWANGLE)
 
 summary(log_base_model)
-vif(log_base_model) # based on vif remove sun elevation
+vif(log_base_model) # based on vif remove SUNEL or Day_D1
 
 # check residuals
 par(mfrow = c(2,2))
@@ -346,8 +358,6 @@ Resids_log
 
 # Include random effect of colony
 
-library(nlme) # Use REML for low sample sizes
-
 # base mixed-effects model
 log_base_lmm <- lme(
   fixed = Log_GA ~ Day_D1 + MEANCOLLECTEDGSD + MEANSUNAZ + MEANSUNEL + MEANOFFNADIRVIEWANGLE,
@@ -357,7 +367,6 @@ log_base_lmm <- lme(
 summary(log_base_lmm) #check other correlations
 anova(log_base_lmm)
 
-library(performance) # can't use vif for lmm
 check_collinearity(log_base_lmm)
 # remove Days since December 1st (correlated with sun el)
 # days since December first may be significant
@@ -434,8 +443,6 @@ acf(resid(AR1_Model))
 ##########################################################################
 # Build candidate models with satellite-related factors
 ##########################################################################
-
-library(MuMIn) # for AICc scores
 
 # compare to log_base_lmm
 # include only max of two covariates
