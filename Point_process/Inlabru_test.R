@@ -283,8 +283,6 @@ ggplot(expect_poi, aes(x = 1:nrow(expect_poi), y = mean)) +
   scale_y_continuous(limits = c(-100, 250), breaks = seq(-100, 250, by=50))
 
 # plot posterior mean, sd, 95% CI for fixed effects
-
-
 fixed_effects <- data.frame(
   effect = GS_model$names.fixed,
   mean = GS_model$summary.fixed$mean,
