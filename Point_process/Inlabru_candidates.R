@@ -16,6 +16,7 @@ library(dplyr)
 library(purrr)
 library(tidyr)
 library(terra) # for rasters
+library(ggpubr)
 
 bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
 
@@ -572,14 +573,13 @@ N_expected$log_score <- -log(N_pred$obs_prob$mean)
 
 N_abundance <- sum(N_expected$mean)
 
-
 ##############################################################################################
 
 # summary statistics (WAIC, DIC, Marginal log-Likelihood)
 
 ##############################################################################################
 
-model_list <- c(G_model, 
+model_list <- list(G_model, 
                 GS_model,
                 GSA_model,
                 GR_model,
@@ -603,31 +603,167 @@ pred_list <- list(G_pred,
 
 saveRDS(pred_list, file = "Inlabru_outputs/pred_list.rds")
 
+# extract summaries and results
+results_list <- list()
+
+model_names <- c("G", "GS", "GSA", "GR", "GRA", "GT", "GTA", "GA", "N")
+
 # loop through models
-for (i in model_list) {
-  model <- i
-  
-  # NOT WORKING
-  
-  fixed_effects <- model$names.fixed
-  
-  print(fixed_effects)
-  
-  # grab summary statistics
-  Intercept_mean <- model$summary.fixed$mean[1]
-  Intercept_sd <- model$summary.fixed$sd[1]
-  Intercept_0.025 <- model$summary.fixed$`0.025quant`[1]
-  Intercept_0.975 <- model$summary.fixed$`0.975quant`[1]
-  
-  # grab diagnostic statistics
-  WAIC <- model$waic$waic
-  DIC <- model$dic$dic
-  MLik <- model$mlik[2]
+for (i in seq_along(model_list)) {
+  model <- model_list[[i]]
+  model_name <- model_names[i]
+
+  # print model name
+  print(model_name)
+
+  # hyperparameters and diagnostics
+    Range_Mean <- model$summary.hyperpar$mean[1]
+    Range_sd <- model$summary.hyperpar$sd[1]
+    Range_0.025 <- model$summary.hyperpar$`0.025quant`[1]
+    Range_0.975 <- model$summary.hyperpar$`0.975quant`[1]
+    
+    Stdev_Mean <- model$summary.hyperpar$mean[2]
+    Stdev_sd <- model$summary.hyperpar$sd[2]
+    Stdev_0.025 <- model$summary.hyperpar$`0.025quant`[2]
+    Stdev_0.975 <- model$summary.hyperpar$`0.975quant`[2]
+    
+    WAIC <- model$waic$waic
+    DIC <- model$dic$dic
+    MLik <- model$mlik[2]
+    
+    # fixed effects
+    for (j in seq_along(model$names.fixed)) {
+      effect_name <- model$names.fixed[j]
+      
+      effect_row <- data.frame(
+        Model = model_name,
+        Effect = effect_name,
+        Mean = model$summary.fixed$mean[j],
+        SD = model$summary.fixed$sd[j],
+        CI_0.025 = model$summary.fixed$`0.025quant`[j],
+        CI_0.975 = model$summary.fixed$`0.975quant`[j],
+        Range_Mean = Range_Mean,
+        Range_SD = Range_sd,
+        Range_0.025 = Range_0.025,
+        Range_0.975 = Range_0.975,
+        Stdev_Mean = Stdev_Mean,
+        Stdev_SD = Stdev_sd,
+        Stdev_0.025 = Stdev_0.025,
+        Stdev_0.975 = Stdev_0.975,
+        WAIC = WAIC,
+        DIC = DIC,
+        MLik = MLik,
+        stringsAsFactors = FALSE
+      )
+      
+      results_list[[length(results_list) + 1]] <- effect_row
+    }
 }
+  
+results_df <- do.call(rbind, results_list)
 
+# add abundance predictions
+abundance_df <- data.frame(
+  Model = c("G", "GS", "GSA", "GR", "GRA", "GT", "GTA", "GA", "N"),
+  predicted_abundance = c(G_abundance, GS_abundance, GSA_abundance, GR_abundance,
+                  GRA_abundance, GT_abundance, GTA_abundance, GA_abundance, N_abundance),
+  stringsAsFactors = FALSE
+)
+results_df <- merge(results_df, abundance_df, by = "Model", all.x = TRUE)
 
-# table of predictions
+# table of predictions and summaries
+summary_table <- results_df %>%
+  select(Model, predicted_abundance, WAIC, DIC, MLik) %>%
+  distinct() %>%
+  arrange(WAIC)
 
+table_plot <- ggtexttable(summary_table, rows = NULL)
+plot(table_plot)
+
+# WAIC plot
+waic_df <- results_df %>%
+  filter(Model != "N") %>%
+  select(Model, WAIC) %>%
+  distinct()
+
+waic_plot <- ggplot(waic_df, aes(x = Model, y = WAIC)) +
+  geom_point(size = 3, color = "black") +
+  labs(
+    x = "Model",
+    y = "WAIC"
+  ) +
+  theme_minimal()
+
+waic_plot
+
+# DIC plot
+dic_df <- results_df %>%
+  filter(Model != "N") %>%
+  select(Model, DIC) %>%
+  distinct()
+
+dic_plot <- ggplot(dic_df, aes(x = Model, y = DIC)) +
+  geom_point(size = 3, color = "black") +
+  labs(
+    x = "Model",
+    y = "DIC"
+  ) +
+  theme_minimal()
+
+dic_plot
+
+# MLik plot
+mlik_df <- results_df %>%
+  filter(Model != "N") %>%
+  select(Model, MLik) %>%
+  distinct()
+
+mlik_plot <- ggplot(mlik_df, aes(x = Model, y = MLik)) +
+  geom_point(size = 3, color = "black") +
+  labs(
+    x = "Model",
+    y = "MLik"
+  ) +
+  theme_minimal()
+
+mlik_plot
+
+# abundance predictions plot
+a_pred_df <- results_df %>%
+  filter(Model != "N") %>%
+  select(Model, predicted_abundance) %>%
+  distinct()
+
+abundance_plot <- ggplot(a_pred_df, aes(x = Model, y = predicted_abundance)) +
+  geom_point(size = 3, color = "black") +
+  labs(
+    x = "Model",
+    y = "Predicted abundance"
+  ) +
+  theme_minimal()
+
+abundance_plot
+
+# fixed effect plots
+plot_list <- list()
+
+for (m in unique(results_df$Model)) {
+  df_model <- results_df %>% filter(Model == m)
+  
+  p <- ggplot(df_model, aes(x = Mean, y = Effect)) +
+    geom_point(size = 3, color = "black") +
+    geom_errorbar(aes(xmin = CI_0.025, xmax = CI_0.975), height = 0.2, color = "gray40") +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+    labs(
+      title = paste(m, "Model"),
+      x = "Estimate",
+      y = "Fixed Effect"
+    ) +
+    theme_minimal()
+  
+  plot_list[[m]] <- p
+}
+ggpubr::ggarrange(plotlist = plot_list, ncol = 3, nrow = 3)
 
 # plot predictions
 G_plot <- ggplot() +
@@ -642,11 +778,13 @@ ggsave("Inlabru_outputs/G_predictions.png", G_plot,
 GS_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GS_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
+  ggtitle("Nest intensity per m")
 ggsave("Inlabru_outputs/GS_predictions.png", GS_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
 )
+
+GS_plot
 
 GSA_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
