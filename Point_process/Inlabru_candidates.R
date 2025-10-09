@@ -21,7 +21,7 @@ library(ggpubr)
 bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
 
 # sessionInfo() - important to note r version and versions of inlabru, INLA, fmesher
-# R version 4.5.0 (2025-04-11 ucrt)
+# R version 4.5.1
 
 # EPSG 3031 is in metres but when plotting geom_sf will convert to degrees
 
@@ -160,6 +160,13 @@ counts_df <- crds(count_raster, df = TRUE, na.rm = TRUE) %>%
   rename(count = sum) %>%
   mutate(present = (count > 0) *1L) %>%
   st_as_sf(coords = c("x", "y"), crs = st_crs(sf_Crozier))
+
+# extract coordinates from sf geometry
+counts_df <- counts_df %>%
+  mutate(
+    x_coord = st_coordinates(.)[, 1],
+    y_coord = st_coordinates(.)[, 2]
+  )
 
 # aggregate covariates to match count raster
 cov_stack <- terra::aggregate(cov_stack, fact = 5, fun = mean)
@@ -671,6 +678,224 @@ abundance_df <- data.frame(
 )
 results_df <- merge(results_df, abundance_df, by = "Model", all.x = TRUE)
 
+# abundance predictions plot
+a_pred_df <- results_df %>%
+  filter(Model != "N") %>%
+  select(Model, predicted_abundance) %>%
+  distinct()
+
+observed_n <- nrow(Crozier_xy)
+
+abundance_plot <- ggplot(a_pred_df, aes(x = Model, y = predicted_abundance)) +
+  geom_point(size = 3, color = "black") +
+  geom_hline(aes(yintercept = observed_n, linetype = "Observed"), color = "red") +
+  scale_linetype_manual(name = "", values = c("Observed" = "dashed")) +
+  labs(
+    x = "Model",
+    y = "Predicted count"
+    ) +
+  scale_y_continuous(limits = c(245000, 252000)) +
+  theme_minimal() +
+  theme(legend.position = "right") 
+
+abundance_plot
+ggsave("Inlabru_outputs/Predicted_count.png", abundance_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+# fixed effect plot
+models_to_plot <- subset(results_df, Model != "N")
+
+plot_list <- list()
+
+for (m in unique(models_to_plot$Model)) {
+  df_model <- models_to_plot %>% 
+    filter(Model == m) %>%
+    mutate(
+      crosses_zero = factor(CI_0.025 <= 0 & CI_0.975 >= 0, levels = c(TRUE, FALSE)))
+  
+  p <- ggplot(df_model, aes(x = Mean, y = Effect)) +
+    geom_point(aes(color = crosses_zero), size = 3) +
+    geom_errorbar(aes(xmin = CI_0.025, xmax = CI_0.975, color = crosses_zero), height = 0.2) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+    scale_color_manual(
+      values = c("TRUE" = "red", "FALSE" = "black"),
+      labels = c("TRUE" = "TRUE", "FALSE" = "FALSE")
+    ) + 
+    labs(color = "Includes 0") +
+    labs(title = paste(m, "Model"), x = NULL, y = NULL) +
+    theme_minimal() +
+    theme(
+      axis.title = element_blank(),
+      legend.position = "right" 
+    )
+  
+  plot_list[[m]] <- p
+}
+effects_plots <- ggpubr::ggarrange(plotlist = plot_list, ncol = 4, nrow = 2,
+                                   common.legend = TRUE,
+                                   legend = "right")
+effects_plots <- annotate_figure(effects_plots,
+    left = text_grob("Effect", rot = 90, vjust = 1, face = "bold"),
+    bottom = text_grob("Mean", face = "bold"))
+ggexport(effects_plots, filename = "Inlabru_outputs/Effects_plots.png",
+       width = 9600, height = 4800, units = "in",
+       res = 600
+)
+
+# plot predictions
+G_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(G_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/G_predictions.png", G_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+       )
+
+GS_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GS_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/GS_predictions.png", GS_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GSA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GSA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/GSA_predictions.png", GSA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GR_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GR_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/GR_predictions.png", GR_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GRA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GRA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/GRA_predictions.png", GRA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GT_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GT_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/GT_predictions.png", GT_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GTA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GTA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/GTA_predictions.png", GTA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+GA_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(GA_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/GA_predictions.png", GA_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
+N_plot <- ggplot() +
+  geom_fm(data = mesh_sub) +
+  gg(N_expected, aes(fill = mean / area), geom = "tile") +
+  ggtitle("Nest intensity per m2")
+ggsave("Inlabru_outputs/N_predictions.png", N_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+) # shows up with nothing
+
+Intensity_plots <- ggpubr::ggarrange(G_plot,
+                                     GS_plot,
+                                     GSA_plot,
+                                     GR_plot,
+                                     GRA_plot,
+                                     GT_plot,
+                                     GTA_plot,
+                                     GA_plot,
+                                     ncol = 2, nrow = 4, 
+                                     labels=c("G","GS","GSA","GR","GRA","GT",
+                                              "GTA","GA"))
+ggsave("Inlabru_outputs/Intensity_plots.png", Intensity_plots,
+       width = 7, height = 7.8, units = "in",
+       dpi = 600
+)
+
+# Plot pearsons residuals for each model
+residuals_list <- list()
+resid_plots <- list()
+
+model_resids_list <- list(G_model, 
+                   GS_model,
+                   GSA_model,
+                   GR_model,
+                   GRA_model,
+                   GT_model,
+                   GTA_model,
+                   GA_model
+)
+
+# loop through models
+for (i in seq_along(model_resids_list)) {
+  model <- model_resids_list[[i]]
+  model_name <- model_names[i]
+  pred <- pred_list[[i]]
+  
+  # print model name
+  print(model_name)
+
+  # compute residuals
+  resids <- counts_df %>%
+    mutate(
+      fitted = pred$expect$mean,
+      residual = (count - fitted)/ sqrt(fitted),
+      model = model_name
+    )
+    
+  residuals_list[[model_name]] <- resids
+  
+  # plot residuals
+  p <- ggplot() +
+    gg(data = mesh_sub) +
+    geom_point(data = resids, aes(x = x_coord, y = y_coord, color = residual), size = 2) +
+    scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+    coord_fixed() +
+    labs(title = paste(model_name),
+          color = "Residuals") +
+    theme_minimal()
+  
+  assign(paste0(model_name, "_resids"), p)
+  resid_plots[[model_name]] <- p
+}
+
+resid_plots <- ggpubr::ggarrange(plotlist = resid_plots, ncol = 2, nrow = 4)
+ggsave("Inlabru_outputs/Resid_plots.png", resid_plots,
+       width = 7, height = 8, units = "in",
+       dpi = 600
+)
+
+# in-model diagnostics
 # table of predictions and summaries
 summary_table <- results_df %>%
   select(Model, predicted_abundance, WAIC, DIC, MLik) %>%
@@ -727,127 +952,3 @@ mlik_plot <- ggplot(mlik_df, aes(x = Model, y = MLik)) +
   theme_minimal()
 
 mlik_plot
-
-# abundance predictions plot
-a_pred_df <- results_df %>%
-  filter(Model != "N") %>%
-  select(Model, predicted_abundance) %>%
-  distinct()
-
-abundance_plot <- ggplot(a_pred_df, aes(x = Model, y = predicted_abundance)) +
-  geom_point(size = 3, color = "black") +
-  labs(
-    x = "Model",
-    y = "Predicted abundance"
-  ) +
-  theme_minimal()
-
-abundance_plot
-
-# fixed effect plots
-plot_list <- list()
-
-for (m in unique(results_df$Model)) {
-  df_model <- results_df %>% filter(Model == m)
-  
-  p <- ggplot(df_model, aes(x = Mean, y = Effect)) +
-    geom_point(size = 3, color = "black") +
-    geom_errorbar(aes(xmin = CI_0.025, xmax = CI_0.975), height = 0.2, color = "gray40") +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
-    labs(
-      title = paste(m, "Model"),
-      x = "Estimate",
-      y = "Fixed Effect"
-    ) +
-    theme_minimal()
-  
-  plot_list[[m]] <- p
-}
-ggpubr::ggarrange(plotlist = plot_list, ncol = 3, nrow = 3)
-
-# plot predictions
-G_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(G_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/G_predictions.png", G_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-       )
-
-GS_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(GS_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per m")
-ggsave("Inlabru_outputs/GS_predictions.png", GS_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-)
-
-GS_plot
-
-GSA_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(GSA_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/GSA_predictions.png", GSA_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-)
-
-GR_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(GR_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/GR_predictions.png", GR_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-)
-
-GRA_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(GRA_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/GRA_predictions.png", GRA_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-)
-
-GT_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(GT_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/GT_predictions.png", GT_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-)
-
-GTA_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(GTA_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/GTA_predictions.png", GTA_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-)
-
-GA_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(GA_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/GA_predictions.png", GA_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-)
-
-N_plot <- ggplot() +
-  geom_fm(data = mesh_sub) +
-  gg(N_expected, aes(fill = mean / area), geom = "tile") +
-  ggtitle("Nest intensity per ~ m")
-ggsave("Inlabru_outputs/N_predictions.png", N_plot,
-       width = 8, height = 5, units = "in",
-       dpi = 600
-) # shows up with nothing
-
-# Plot residuals
-
