@@ -17,6 +17,7 @@ library(purrr)
 library(tidyr)
 library(terra) # for rasters
 library(ggpubr)
+library(scoringRules) # for CRPS
 
 bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
 
@@ -895,7 +896,16 @@ ggsave("Inlabru_outputs/Resid_plots.png", resid_plots,
        dpi = 600
 )
 
-# in-model diagnostics
+# model evaluation: CRPS (continuous ranked probability scores)
+# use scoringRules package
+
+# crps pois(y = vector of observations, lambda = vector of non-negative means)
+crps_pois()
+mean_crps <- mean()
+
+
+# in-model diagnostics: not needed
+
 # table of predictions and summaries
 summary_table <- results_df %>%
   select(Model, predicted_abundance, WAIC, DIC, MLik) %>%
@@ -952,3 +962,11 @@ mlik_plot <- ggplot(mlik_df, aes(x = Model, y = MLik)) +
   theme_minimal()
 
 mlik_plot
+
+# model selection? select final model and then run partial predictions
+
+# partial predictions
+
+# vectors of full range of covariates
+percent_guano <- data.frame(percent_guano = seq(-0.18382, 5.76802, length.out = 1000))
+# other covariates depend on final model
