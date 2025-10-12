@@ -204,7 +204,7 @@ All_3_plot <- plot(ggarrange(ADAR_plot2,
                              label.x = 0.1))
 All_3_plot <- annotate_figure(All_3_plot, left = "Log guano area (m²)", bottom = "Days since December 1st")
 
-# Figure 3 of Chap 1
+# Figure 2 of Chap 1
 ggsave("Chap1_outputs/Seasonal_GA_by_colony.png", All_3_plot,
        width = 8, height = 5, units = "in",
        dpi = 600)
@@ -245,7 +245,7 @@ Box_plot <- ggplot(Dataset.1.4, aes(x = Colony, y = Log_GA, fill = Colony)) +
 
 Box_plot
 
-# Figure 4 of Chap 1
+# Figure 3 of Chap 1
 ggsave("Chap1_outputs/Seasonal_GA_boxplot.png", Box_plot,
        width = 8, height = 5, units = "in",
        dpi = 600)
@@ -870,7 +870,7 @@ All_plot <- ggplot(Dataset.2.1, aes(x = Log_BP, y = Log_GA, colour = Colony_name
   annotate("text", x = 8, y = 13, 
            label = paste0("R² = ", r2)) +
   xlab("Log BP") +
-  ylab("Log Guano area (m2)") +
+  ylab("Log guano area (m²)") +
   theme_minimal() +
   theme(legend.position = "right") +
   theme(axis.line = element_line(color='black'),
@@ -882,6 +882,11 @@ All_plot <- ggplot(Dataset.2.1, aes(x = Log_BP, y = Log_GA, colour = Colony_name
   scale_color_manual(values = colours_14)
 
 All_plot
+
+# Figure 4 of Chap 1
+ggsave("Chap1_outputs/GA_BP_plot.png", All_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600)
 
 ##########################################################################
 # Test for influence of Feb estimates on BP predictions
