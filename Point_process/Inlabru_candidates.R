@@ -72,6 +72,24 @@ print(Crozier_mesh$n)
 mesh_sub <- fm_subdivide(Crozier_mesh,3)
 print(mesh_sub$n)
 
+# plot mesh with coastline boundary
+mesh_plot_Crozier <- ggplot() + 
+  geom_fm(data = mesh_sub) + 
+  geom_sf(data = buff_boundary, fill = NA, color = "blue") +
+  geom_sf(data = sf_Crozier, color = "purple", size = 1.7, alpha = 0.5) + 
+  labs( 
+    x = "Easting", 
+    y = "Northing", 
+  ) + 
+  theme_minimal()
+# geom_sf converts to degrees
+
+mesh_plot_Crozier
+ggsave("Inlabru_outputs/Mesh_plot.png", mesh_plot_Crozier,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
 ##############################################################################################
 
 # covariates
@@ -679,6 +697,9 @@ abundance_df <- data.frame(
 )
 results_df <- merge(results_df, abundance_df, by = "Model", all.x = TRUE)
 
+# save model outputs
+write.csv(results_df, file = "Inlabru_outputs/Candidate_results.csv", row.names = FALSE)
+
 # abundance predictions plot
 a_pred_df <- results_df %>%
   filter(Model != "N") %>%
@@ -888,6 +909,14 @@ for (i in seq_along(model_resids_list)) {
   
   assign(paste0(model_name, "_resids"), p)
   resid_plots[[model_name]] <- p
+  
+  # save each plot individually
+  ggsave(
+    filename = paste0("Inlabru_outputs/", model_name, "_resids.png"),
+    plot = p,
+    width = 8, height = 5, units = "in", dpi = 600
+  )
+  
 }
 
 resid_plots <- ggpubr::ggarrange(plotlist = resid_plots, ncol = 2, nrow = 4)
@@ -899,9 +928,65 @@ ggsave("Inlabru_outputs/Resid_plots.png", resid_plots,
 # model evaluation: CRPS (continuous ranked probability scores)
 # use scoringRules package
 
-# crps pois(y = vector of observations, lambda = vector of non-negative means)
-crps_pois()
-mean_crps <- mean()
+CRPS_list <- list(G_pred,
+                  GS_pred,
+                  GSA_pred,
+                  GR_pred,
+                  GRA_pred,
+                  GT_pred,
+                  GTA_pred,
+                  GA_pred
+)
+
+# observed counts
+observed_counts <- counts_df$count #y
+
+# crps_pois(y = vector of observations, lambda = vector of non-negative means)
+compute_crps <- function(pred_obj) {
+  predicted_means <- pred_obj$expect$mean
+  crps_values <- crps_pois(y = observed_counts, lambda = predicted_means)
+  as.list(summary(crps_values))
+}
+
+model_names <- c("G", "GS", "GSA", "GR", "GRA", "GT", "GTA", "GA")
+crps_summary_list <- lapply(CRPS_list, compute_crps)
+
+# table of crps values
+crps_table <- bind_rows(crps_summary_list) %>%
+  mutate(Model = model_names) %>%
+  select(Model, Min., `1st Qu.`, Median, Mean, `3rd Qu.`, Max.)
+
+crps_plot <- ggtexttable(crps_table, rows = NULL)
+plot(crps_plot)
+
+# add log-score values for checking predictive preformace
+
+logscore_list <- list(G_expected,
+                      GS_expected,
+                      GSA_expected,
+                      GR_expected,
+                      GRA_expected,
+                      GT_expected,
+                      GTA_expected,
+                      GA_expected
+)
+
+compute_logscore <- function(expected_obj) {
+  mean_logscore <- mean(expected_obj$log_score)
+  as.list(mean_logscore)
+}
+
+mean_logscores <- lapply(logscore_list, compute_logscore)
+
+logscore_vector <- unlist(mean_logscores)
+
+crps_table <- bind_rows(crps_summary_list) %>%
+  mutate(Model = model_names,
+         LogScore = logscore_vector) %>%
+  select(Model, Min., `1st Qu.`, Median, Mean, `3rd Qu.`, Max., LogScore)
+
+crps_plot <- ggtexttable(crps_table, rows = NULL)
+plot(crps_plot)
 
 
 # in-model diagnostics: not needed
