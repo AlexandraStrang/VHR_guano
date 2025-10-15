@@ -173,6 +173,16 @@ res(count_raster) # 10 x 10 m
 summary(count_raster)
 # 149 penguins in 100 m2
 
+# sum of area that has zero penguins
+cell_areas <- count_raster[[1]]
+zero_cells <- count_raster[[2]] == 0
+zero_area <- mask(cell_areas, zero_cells, maskvalue = FALSE)
+total_zero_area <- global(zero_area, fun = "sum", na.rm = TRUE)
+print(total_zero_area)
+
+total_raster_area <- global(cell_areas, fun = "sum", na.rm = TRUE)
+print(total_raster_area)
+
 # extract the coordinates for these pixels
 counts_df <- crds(count_raster, df = TRUE, na.rm = TRUE) %>%
   bind_cols(values(count_raster, mat = TRUE, na.rm = TRUE)) %>%
@@ -726,6 +736,28 @@ ggsave("Inlabru_outputs/Predicted_count.png", abundance_plot,
        dpi = 600
 )
 
+# difference from observed plot
+diff_df <- results_df %>%
+  filter(Model != "N") %>%
+  select(Model, predicted_abundance) %>%
+  distinct() %>%
+  mutate(difference = predicted_abundance - observed_n)
+
+# Plot
+difference_plot <- ggplot(diff_df, aes(x = Model, y = difference)) +
+  geom_point(size = 3, color = "black") +
+  labs(
+    x = "Model",
+    y = "Predicted abundance - observed count") +
+  scale_y_continuous(limits = c(5100, 5500)) +
+  theme_minimal()
+
+difference_plot
+ggsave("Inlabru_outputs/Difference_plot.png", difference_plot,
+       width = 8, height = 5, units = "in",
+       dpi = 600
+)
+
 # fixed effect plot
 models_to_plot <- subset(results_df, Model != "N")
 
@@ -987,6 +1019,17 @@ crps_table <- bind_rows(crps_summary_list) %>%
 
 crps_plot <- ggtexttable(crps_table, rows = NULL)
 plot(crps_plot)
+
+# make nicer table
+model_eval <- crps_table
+model_eval$CRPS_Mean <- model_eval$Mean
+model_eval$CRPS_Min <- model_eval$Min.
+model_eval$CRPS_Median <- model_eval$Median
+model_eval$CRPS_Max <- model_eval$Max.
+model_eval <- model_eval[,c("Model","CRPS_Min","CRPS_Median","CRPS_Mean","CRPS_Max","LogScore")]
+
+model_eval_table <- ggtexttable(model_eval, rows = NULL)
+plot(model_eval_table)
 
 
 # in-model diagnostics: not needed
