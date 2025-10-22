@@ -716,7 +716,8 @@ a_pred_df <- results_df %>%
   select(Model, predicted_abundance) %>%
   distinct()
 
-observed_n <- nrow(Crozier_xy)
+observed_n <- 246017 # use Ballard and Schmidt 2020 count
+#observed_n <- nrow(Crozier_xy)
 
 abundance_plot <- ggplot(a_pred_df, aes(x = Model, y = predicted_abundance)) +
   geom_point(size = 3, color = "black") +
@@ -748,8 +749,8 @@ difference_plot <- ggplot(diff_df, aes(x = Model, y = difference)) +
   geom_point(size = 3, color = "black") +
   labs(
     x = "Model",
-    y = "Predicted abundance - observed count") +
-  scale_y_continuous(limits = c(5100, 5500)) +
+    y = "Predicted - observed count") +
+  scale_y_continuous(limits = c(5000, 5500)) +
   theme_minimal()
 
 difference_plot
@@ -1091,10 +1092,15 @@ mlik_plot <- ggplot(mlik_df, aes(x = Model, y = MLik)) +
 
 mlik_plot
 
-# model selection? select final model and then run partial predictions
+# model selection
 
+# could use R2 predicted for predicting at Cape Crozier 2019
+
+# select final model and then run partial predictions
 # partial predictions
 
 # vectors of full range of covariates
 percent_guano <- data.frame(percent_guano = seq(-0.18382, 5.76802, length.out = 1000))
 # other covariates depend on final model
+
+# compute response curves
