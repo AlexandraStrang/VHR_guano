@@ -121,5 +121,5 @@ plot(northness)
 plot(eastness)
 
 # save as raster (run once)
-writeRaster(northness, "Cape_Crozier_northness.tif", overwrite=TRUE)
-writeRaster(eastness,  "Cape_Crozier_eastness.tif",  overwrite=TRUE)
+writeRaster(northness, "Crozier_terrain_mesh/Cape_Crozier_northness.tif", overwrite=TRUE)
+writeRaster(eastness,  "Crozier_terrain_mesh/Cape_Crozier_eastness.tif",  overwrite=TRUE)
