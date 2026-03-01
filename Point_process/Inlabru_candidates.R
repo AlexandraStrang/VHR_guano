@@ -4,14 +4,14 @@
 
 # set working directory
 setwd("C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
-setwd(setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data"))
+#setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
 
 # load packages 
 library(sf)
 library(fmesher)
 library(ggplot2)
 library(INLA) # version 25.09.19
-library(inlabru) # for lgcp() version 2.13.0
+library(inlabru) # for bru() version 2.13.0 (currently using 2.13.0.9004?)
 library(dplyr)
 library(purrr)
 library(tidyr)
@@ -28,16 +28,14 @@ bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
 
 # read in points from xy csv
 # Cape Crozier 2020
-Crozier_xy <- read.csv("Crozier_Points_2020_3031.csv")
+Crozier_xy <- read.csv("Crozier_UAV_points/Reprojected_3031/Crozier_2020_Points_3031.csv")
 
 # convert to sf object and check CRS
 sf_Crozier <- st_as_sf(Crozier_xy, coords = c("x", "y"), crs = 3031)
 st_crs(sf_Crozier)
 
 ##############################################################################################
-
 # mesh
-
 ##############################################################################################
 
 # import Crozier coastline boundary
@@ -66,11 +64,13 @@ Crozier_mesh <- fm_mesh_2d(boundary = buff_boundary,
                            cutoff = 0.3,
                            crs = st_crs(sf_Crozier))
 print(Crozier_mesh$n)
+# 2816
 
 # subdivide mesh
 # splits triangles into subtriangles
 mesh_sub <- fm_subdivide(Crozier_mesh,3)
 print(mesh_sub$n)
+# 44519
 
 # plot mesh with coastline boundary
 mesh_plot_Crozier <- ggplot() + 
@@ -91,9 +91,7 @@ ggsave("Inlabru_outputs/Mesh_plot.png", mesh_plot_Crozier,
 )
 
 ##############################################################################################
-
 # covariates
-
 ##############################################################################################
 
 # add covariates at 2m res (aggregated below)
@@ -107,15 +105,12 @@ crs(percent_guano_raster)
 
 res(percent_guano_raster) # 2m x 2m
 
-# terrain rasters clipped by mesh
-slope_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_slope.tif") # 2m slope raster
-aspect_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_aspect_corrected.tif") # 2m aspect raster
-roughness_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_Roughness.tif") # 2m
-TRI_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_TRI.tif") # 2m
-
-# change corrected aspect crs to match 
-crs(aspect_raster) <- "EPSG:3031"
-crs(aspect_raster)
+# 2m terrain rasters clipped by mesh
+slope_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_slope.tif")
+northness_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_northness.tif")
+eastness_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_eastness.tif")
+roughness_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_Roughness.tif")
+TRI_raster <- rast("Crozier_terrain_mesh/Cape_Crozier_TRI.tif")
 
 # match guano area extent to terrain rasters
 percent_guano_raster <- extend(percent_guano_raster, slope_raster)
@@ -141,7 +136,8 @@ standardize <- function(r) {
 # apply to continuous variables
 percent_guano_raster   <- standardize(percent_guano_raster)
 slope_raster     <- standardize(slope_raster)
-aspect_raster    <- standardize(aspect_raster)
+northness_raster    <- standardize(northness_raster)
+eastness_raster    <- standardize(eastness_raster)
 roughness_raster <- standardize(roughness_raster)
 TRI_raster       <- standardize(TRI_raster)
 
@@ -151,10 +147,16 @@ summary(percent_guano_raster)
 percent_guano_raster[is.na(percent_guano_raster)] <- 0
 
 # check for misalignment
-covariate_plot <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
+covariate_plot <- c(percent_guano_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
+plot(covariate_plot)
 
 # stack covariates
-cov_stack <- c(percent_guano_raster, slope_raster, aspect_raster, roughness_raster, TRI_raster)
+cov_stack <- c(percent_guano_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
+
+# check for colinearity between covariates
+cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
+
+cor(cov_values) # need to do upon re-run
 
 # prepare response variable
 count_raster <- 
@@ -183,6 +185,8 @@ print(total_zero_area)
 total_raster_area <- global(cell_areas, fun = "sum", na.rm = TRUE)
 print(total_raster_area)
 
+# total - zero area = 585,594 m2 (area with penguins)
+
 # extract the coordinates for these pixels
 counts_df <- crds(count_raster, df = TRUE, na.rm = TRUE) %>%
   bind_cols(values(count_raster, mat = TRUE, na.rm = TRUE)) %>%
@@ -201,9 +205,7 @@ counts_df <- counts_df %>%
 cov_stack <- terra::aggregate(cov_stack, fact = 5, fun = mean)
 
 ##############################################################################################
-
 # run models
-
 ##############################################################################################
 
 set.seed(28)
@@ -218,13 +220,15 @@ matern <- inla.spde2.pcmatern(mesh = mesh_sub,
 # Candidate model codes (8):
 # G - percent guano only
 # GS - percent guano + slope
-# GSA - percent guano + slope + aspect
+# GSNE - percent guano + slope + northness + eastness
 # GR - percent guano + roughness
-# GRA - percent guano + roughness + aspect
+# GRNE - percent guano + roughness + northness + eastness
 # GT - percent guano + TRI
-# GTA - percent guano + TRI + aspect
-# GA - percent guano + aspect
+# GTNE - percent guano + TRI + northness + eastness
+# GNE - percent guano + northness + eastness
 # N - Null model (spatial field only)
+
+# northness and eastness have some NAs
 
 # Guano model
 G_cmp <- ~ Intercept(1) +
@@ -267,27 +271,28 @@ summary(GS_model)
 
 saveRDS(GS_model, file = "Inlabru_outputs/GS_model.rds")
 
-# Guano + slope + aspect model
-GSA_cmp <- ~ Intercept(1) +
+# Guano + slope + northness + eastness model
+GSNE_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
   slope(cov_stack$Cape_Crozier_slope, model = "linear") +
-  aspect(cov_stack$Cape_Crozier_aspect_corrected, model = "linear") +
+  northness(cov_stack$northness, model = "linear") +
+  eastness(cov_stack$eastness, model = "linear") +
   field(geometry, model = matern)
 
-GSA_model <- bru(
-  GSA_cmp,
+GSNE_model <- bru(
+  GSNE_cmp,
   bru_obs(
     family = "poisson", data = counts_df,
     formula = count ~ Intercept +
-      percentguano + slope + aspect +
+      percentguano + slope + northness + eastness +
       field,
     E = area
   )
 )
 
-summary(GSA_model)
+summary(GSNE_model)
 
-saveRDS(GSA_model, file = "Inlabru_outputs/GSA_model.rds")
+saveRDS(GSNE_model, file = "Inlabru_outputs/GSNE_model.rds")
 
 # Guano + roughness model
 GR_cmp <- ~ Intercept(1) +
@@ -310,27 +315,28 @@ summary(GR_model)
 
 saveRDS(GR_model, file = "Inlabru_outputs/GR_model.rds")
 
-# Guano + roughness + aspect model
-GRA_cmp <- ~ Intercept(1) +
+# Guano + roughness + northness + eastness model
+GRNE_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
   roughness(cov_stack$Cape_Crozier_Roughness, model = "linear") +
-  aspect(cov_stack$Cape_Crozier_aspect_corrected, model = "linear") +
+  northness(cov_stack$northness, model = "linear") +
+  eastness(cov_stack$eastness, model = "linear") +
   field(geometry, model = matern)
 
-GRA_model <- bru(
-  GRA_cmp,
+GRNE_model <- bru(
+  GRNE_cmp,
   bru_obs(
     family = "poisson", data = counts_df,
     formula = count ~ Intercept +
-      percentguano + roughness + aspect +
+      percentguano + roughness + northness + eastness +
       field,
     E = area
   )
 )
 
-summary(GRA_model)
+summary(GRNE_model)
 
-saveRDS(GRA_model, file = "Inlabru_outputs/GRA_model.rds")
+saveRDS(GRNE_model, file = "Inlabru_outputs/GRNE_model.rds")
 
 # Guano + TRI model
 GT_cmp <- ~ Intercept(1) +
@@ -353,49 +359,50 @@ summary(GT_model)
 
 saveRDS(GT_model, file = "Inlabru_outputs/GT_model.rds")
 
-# Guano + TRI + aspect model
-GTA_cmp <- ~ Intercept(1) +
+# Guano + TRI + northness + eastness model
+GTNE_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
   TRI(cov_stack$Cape_Crozier_TRI, model = "linear") +
-  aspect(cov_stack$Cape_Crozier_aspect_corrected, model = "linear") +
+  northness(cov_stack$northness, model = "linear") +
+  eastness(cov_stack$eastness, model = "linear") +
   field(geometry, model = matern)
 
-GTA_model <- bru(
-  GTA_cmp,
+GTNE_model <- bru(
+  GTNE_cmp,
   bru_obs(
     family = "poisson", data = counts_df,
     formula = count ~ Intercept +
-      percentguano + TRI + aspect +
+      percentguano + TRI + northness + eastness +
       field,
     E = area
   )
 )
 
-summary(GTA_model)
+summary(GTNE_model)
 
-saveRDS(GTA_model, file = "Inlabru_outputs/GTA_model.rds")
+saveRDS(GTNE_model, file = "Inlabru_outputs/GTNE_model.rds")
 
-# Guano + aspect model
-GA_cmp <- ~ Intercept(1) +
+# Guano + northness + eastness model
+GNE_cmp <- ~ Intercept(1) +
   percentguano(cov_stack$CrozierGuano_2m, model = "linear") +
-  aspect(cov_stack$Cape_Crozier_aspect_corrected, model = "linear") +
+  northness(cov_stack$northness, model = "linear") +
+  eastness(cov_stack$eastness, model = "linear") +
   field(geometry, model = matern)
 
-GA_model <- bru(
-  GA_cmp,
+GNE_model <- bru(
+  GNE_cmp,
   bru_obs(
     family = "poisson", data = counts_df,
     formula = count ~ Intercept +
-      percentguano + aspect +
+      percentguano + northness + eastness +
       field,
     E = area
   )
 )
-# aspect has some NAs
 
-summary(GA_model)
+summary(GNE_model)
 
-saveRDS(GA_model, file = "Inlabru_outputs/GA_model.rds")
+saveRDS(GNE_model, file = "Inlabru_outputs/GNE_model.rds")
 
 # Null model
 N_cmp <- ~ Intercept(1) +
@@ -415,10 +422,8 @@ summary(N_model)
 
 saveRDS(N_model, file = "Inlabru_outputs/N_model.rds")
 
-##############################################################################################
-
+#############################################################################################
 # predictions
-
 ##############################################################################################
 
 # G model predictions
@@ -436,11 +441,7 @@ G_pred <- predict(
   n.samples = 1000
 )
 
-G_expected <- G_pred$expect
-G_expected$pred_var <- G_expected$mean + G_expected$sd^2
-G_expected$log_score <- -log(G_pred$obs_prob$mean)
-
-G_abundance <- sum(G_expected$mean)
+saveRDS(G_pred, file = "Inlabru_outputs/G_pred.rds")
 
 # GS model predictions
 GS_pred <- predict(
@@ -457,18 +458,14 @@ GS_pred <- predict(
   n.samples = 1000
 )
 
-GS_expected <- GS_pred$expect
-GS_expected$pred_var <- GS_expected$mean + GS_expected$sd^2
-GS_expected$log_score <- -log(GS_pred$obs_prob$mean)
+saveRDS(GS_pred, file = "Inlabru_outputs/GS_pred.rds")
 
-GS_abundance <- sum(GS_expected$mean)
-
-# GSA model predictions
-GSA_pred <- predict(
-  GSA_model, counts_df,
+# GSNE model predictions
+GSNE_pred <- predict(
+  GSNE_model, counts_df,
   ~{
     expect <- exp(Intercept + 
-                    percentguano + slope + aspect +
+                    percentguano + slope + northness + eastness +
                     field) * area
     list(
       expect = expect,
@@ -478,11 +475,7 @@ GSA_pred <- predict(
   n.samples = 1000
 )
 
-GSA_expected <- GSA_pred$expect
-GSA_expected$pred_var <- GSA_expected$mean + GSA_expected$sd^2
-GSA_expected$log_score <- -log(GSA_pred$obs_prob$mean)
-
-GSA_abundance <- sum(GSA_expected$mean)
+saveRDS(GSNE_pred, file = "Inlabru_outputs/GSNE_pred.rds")
 
 # GR model predictions
 GR_pred <- predict(
@@ -499,18 +492,14 @@ GR_pred <- predict(
   n.samples = 1000
 )
 
-GR_expected <- GR_pred$expect
-GR_expected$pred_var <- GR_expected$mean + GR_expected$sd^2
-GR_expected$log_score <- -log(GR_pred$obs_prob$mean)
+saveRDS(GR_pred, file = "Inlabru_outputs/GR_pred.rds")
 
-GR_abundance <- sum(GR_expected$mean)
-
-# GRA model predictions
-GRA_pred <- predict(
-  GRA_model, counts_df,
+# GRNE model predictions
+GRNE_pred <- predict(
+  GRNE_model, counts_df,
   ~{
     expect <- exp(Intercept + 
-                    percentguano + roughness + aspect +
+                    percentguano + roughness + northness + eastness +
                     field) * area
     list(
       expect = expect,
@@ -520,11 +509,7 @@ GRA_pred <- predict(
   n.samples = 1000
 )
 
-GRA_expected <- GRA_pred$expect
-GRA_expected$pred_var <- GRA_expected$mean + GRA_expected$sd^2
-GRA_expected$log_score <- -log(GRA_pred$obs_prob$mean)
-
-GRA_abundance <- sum(GRA_expected$mean)
+saveRDS(GRNE_pred, file = "Inlabru_outputs/GRNE_pred.rds")
 
 # GT model predictions
 GT_pred <- predict(
@@ -541,18 +526,14 @@ GT_pred <- predict(
   n.samples = 1000
 )
 
-GT_expected <- GT_pred$expect
-GT_expected$pred_var <- GT_expected$mean + GT_expected$sd^2
-GT_expected$log_score <- -log(GT_pred$obs_prob$mean)
+saveRDS(GT_pred, file = "Inlabru_outputs/GT_pred.rds")
 
-GT_abundance <- sum(GT_expected$mean)
-
-# GTA model predictions
-GTA_pred <- predict(
-  GTA_model, counts_df,
+# GTNE model predictions
+GTNE_pred <- predict(
+  GTNE_model, counts_df,
   ~{
     expect <- exp(Intercept + 
-                    percentguano + TRI + aspect +
+                    percentguano + TRI + northness + eastness +
                     field) * area
     list(
       expect = expect,
@@ -562,18 +543,14 @@ GTA_pred <- predict(
   n.samples = 1000
 )
 
-GTA_expected <- GTA_pred$expect
-GTA_expected$pred_var <- GTA_expected$mean + GTA_expected$sd^2
-GTA_expected$log_score <- -log(GTA_pred$obs_prob$mean)
+saveRDS(GTNE_pred, file = "Inlabru_outputs/GTNE_pred.rds")
 
-GTA_abundance <- sum(GTA_expected$mean)
-
-# GA model predictions
-GA_pred <- predict(
-  GA_model, counts_df,
+# GNE model predictions
+GNE_pred <- predict(
+  GNE_model, counts_df,
   ~{
     expect <- exp(Intercept + 
-                    percentguano + aspect +
+                    percentguano + northness + eastness +
                     field) * area
     list(
       expect = expect,
@@ -583,11 +560,7 @@ GA_pred <- predict(
   n.samples = 1000
 )
 
-GA_expected <- GA_pred$expect
-GA_expected$pred_var <- GA_expected$mean + GA_expected$sd^2
-GA_expected$log_score <- -log(GA_pred$obs_prob$mean)
-
-GA_abundance <- sum(GA_expected$mean)
+saveRDS(GNE_pred, file = "Inlabru_outputs/GNE_pred.rds")
 
 # N model predictions
 N_pred <- predict(
@@ -603,46 +576,106 @@ N_pred <- predict(
   n.samples = 1000
 )
 
+saveRDS(N_pred, file = "Inlabru_outputs/N_pred.rds")
+
+##############################################################################################
+# summary statistics (WAIC, DIC, Marginal log-Likelihood)
+##############################################################################################
+
+model_list <- list(G_model, 
+                GS_model,
+                GSNE_model,
+                GR_model,
+                GRNE_model,
+                GT_model,
+                GTNE_model,
+                GNE_model,
+                N_model
+                )
+
+saveRDS(model_list, file = "Inlabru_outputs/model_list.rds")
+
+pred_list <- list(G_pred,
+                  GS_pred,
+                  GSNE_pred,
+                  GR_pred,
+                  GRNE_pred,
+                  GT_pred,
+                  GTNE_pred,
+                  GNE_pred,
+                  N_pred
+)
+
+saveRDS(pred_list, file = "Inlabru_outputs/pred_list.rds")
+
+# calculate expected counts, log-scores and overall abundance
+
+G_expected <- G_pred$expect
+G_expected$pred_var <- G_expected$mean + G_expected$sd^2
+G_expected$log_score <- -log(G_pred$obs_prob$mean)
+
+G_abundance <- sum(G_expected$mean)
+
+
+GS_expected <- GS_pred$expect
+GS_expected$pred_var <- GS_expected$mean + GS_expected$sd^2
+GS_expected$log_score <- -log(GS_pred$obs_prob$mean)
+
+GS_abundance <- sum(GS_expected$mean)
+
+
+GSNE_expected <- GSNE_pred$expect
+GSNE_expected$pred_var <- GSNE_expected$mean + GSNE_expected$sd^2
+GSNE_expected$log_score <- -log(GSNE_pred$obs_prob$mean)
+
+GSNE_abundance <- sum(GSNE_expected$mean)
+
+GR_expected <- GR_pred$expect
+GR_expected$pred_var <- GR_expected$mean + GR_expected$sd^2
+GR_expected$log_score <- -log(GR_pred$obs_prob$mean)
+
+GR_abundance <- sum(GR_expected$mean)
+
+
+GRNE_expected <- GRNE_pred$expect
+GRNE_expected$pred_var <- GRNE_expected$mean + GRNE_expected$sd^2
+GRNE_expected$log_score <- -log(GRNE_pred$obs_prob$mean)
+
+GRNE_abundance <- sum(GRNE_expected$mean)
+
+
+GT_expected <- GT_pred$expect
+GT_expected$pred_var <- GT_expected$mean + GT_expected$sd^2
+GT_expected$log_score <- -log(GT_pred$obs_prob$mean)
+
+GT_abundance <- sum(GT_expected$mean)
+
+
+GTNE_expected <- GTNE_pred$expect
+GTNE_expected$pred_var <- GTNE_expected$mean + GTNE_expected$sd^2
+GTNE_expected$log_score <- -log(GTNE_pred$obs_prob$mean)
+
+GTNE_abundance <- sum(GTNE_expected$mean)
+
+
+GNE_expected <- GNE_pred$expect
+GNE_expected$pred_var <- GNE_expected$mean + GNE_expected$sd^2
+GNE_expected$log_score <- -log(GNE_pred$obs_prob$mean)
+
+GNE_abundance <- sum(GNE_expected$mean)
+
+
 N_expected <- N_pred$expect
 N_expected$pred_var <- N_expected$mean + N_expected$sd^2
 N_expected$log_score <- -log(N_pred$obs_prob$mean)
 
 N_abundance <- sum(N_expected$mean)
 
-##############################################################################################
-
-# summary statistics (WAIC, DIC, Marginal log-Likelihood)
-
-##############################################################################################
-
-model_list <- list(G_model, 
-                GS_model,
-                GSA_model,
-                GR_model,
-                GRA_model,
-                GT_model,
-                GTA_model,
-                GA_model,
-                N_model
-                )
-
-pred_list <- list(G_pred,
-                  GS_pred,
-                  GSA_pred,
-                  GR_pred,
-                  GRA_pred,
-                  GT_pred,
-                  GTA_pred,
-                  GA_pred,
-                  N_pred
-)
-
-saveRDS(pred_list, file = "Inlabru_outputs/pred_list.rds")
 
 # extract summaries and results
 results_list <- list()
 
-model_names <- c("G", "GS", "GSA", "GR", "GRA", "GT", "GTA", "GA", "N")
+model_names <- c("G", "GS", "GSNE", "GR", "GRNE", "GT", "GTNE", "GNE", "N")
 
 # loop through models
 for (i in seq_along(model_list)) {
@@ -689,7 +722,7 @@ for (i in seq_along(model_list)) {
         WAIC = WAIC,
         DIC = DIC,
         MLik = MLik,
-        stringsAsFactors = FALSE
+        stringsasFactors = FALSE
       )
       
       results_list[[length(results_list) + 1]] <- effect_row
@@ -700,18 +733,21 @@ results_df <- do.call(rbind, results_list)
 
 # add abundance predictions
 abundance_df <- data.frame(
-  Model = c("G", "GS", "GSA", "GR", "GRA", "GT", "GTA", "GA", "N"),
-  predicted_abundance = c(G_abundance, GS_abundance, GSA_abundance, GR_abundance,
-                  GRA_abundance, GT_abundance, GTA_abundance, GA_abundance, N_abundance),
-  stringsAsFactors = FALSE
+  Model = c("G", "GS", "GSNE", "GR", "GRNE", "GT", "GTNE", "GNE", "N"),
+  predicted_abundance = c(G_abundance, GS_abundance, GSNE_abundance, GR_abundance,
+                  GRNE_abundance, GT_abundance, GTNE_abundance, GNE_abundance, N_abundance)
 )
+
+# save abundance df
+write.csv(abundance_df, file = "Inlabru_outputs/Abundance_predictions.csv", row.names = FALSE)
+
 results_df <- merge(results_df, abundance_df, by = "Model", all.x = TRUE)
 
 # save model outputs
 write.csv(results_df, file = "Inlabru_outputs/Candidate_results.csv", row.names = FALSE)
 
 # abundance predictions plot
-a_pred_df <- results_df %>%
+a_pred_df <- abundance_df %>%
   filter(Model != "N") %>%
   select(Model, predicted_abundance) %>%
   distinct()
@@ -732,13 +768,14 @@ abundance_plot <- ggplot(a_pred_df, aes(x = Model, y = predicted_abundance)) +
   theme(legend.position = "right") 
 
 abundance_plot
+
 ggsave("Inlabru_outputs/Predicted_count.png", abundance_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
 )
 
 # difference from observed plot
-diff_df <- results_df %>%
+diff_df <- abundance_df %>%
   filter(Model != "N") %>%
   select(Model, predicted_abundance) %>%
   distinct() %>%
@@ -750,10 +787,11 @@ difference_plot <- ggplot(diff_df, aes(x = Model, y = difference)) +
   labs(
     x = "Model",
     y = "Predicted - observed count") +
-  scale_y_continuous(limits = c(5000, 5500)) +
+  scale_y_continuous(limits = c(5000, 5600)) +
   theme_minimal()
 
 difference_plot
+
 ggsave("Inlabru_outputs/Difference_plot.png", difference_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -818,11 +856,11 @@ ggsave("Inlabru_outputs/GS_predictions.png", GS_plot,
        dpi = 600
 )
 
-GSA_plot <- ggplot() +
+GSNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
-  gg(GSA_expected, aes(fill = mean / area), geom = "tile") +
+  gg(GSNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
-ggsave("Inlabru_outputs/GSA_predictions.png", GSA_plot,
+ggsave("Inlabru_outputs/GSNE_predictions.png", GSNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
 )
@@ -836,11 +874,11 @@ ggsave("Inlabru_outputs/GR_predictions.png", GR_plot,
        dpi = 600
 )
 
-GRA_plot <- ggplot() +
+GRNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
-  gg(GRA_expected, aes(fill = mean / area), geom = "tile") +
+  gg(GRNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
-ggsave("Inlabru_outputs/GRA_predictions.png", GRA_plot,
+ggsave("Inlabru_outputs/GRNE_predictions.png", GRNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
 )
@@ -854,20 +892,20 @@ ggsave("Inlabru_outputs/GT_predictions.png", GT_plot,
        dpi = 600
 )
 
-GTA_plot <- ggplot() +
+GTNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
-  gg(GTA_expected, aes(fill = mean / area), geom = "tile") +
+  gg(GTNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
-ggsave("Inlabru_outputs/GTA_predictions.png", GTA_plot,
+ggsave("Inlabru_outputs/GTNE_predictions.png", GTNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
 )
 
-GA_plot <- ggplot() +
+GNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
-  gg(GA_expected, aes(fill = mean / area), geom = "tile") +
+  gg(GNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
-ggsave("Inlabru_outputs/GA_predictions.png", GA_plot,
+ggsave("Inlabru_outputs/GNE_predictions.png", GNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
 )
@@ -883,15 +921,15 @@ ggsave("Inlabru_outputs/N_predictions.png", N_plot,
 
 Intensity_plots <- ggpubr::ggarrange(G_plot,
                                      GS_plot,
-                                     GSA_plot,
+                                     GSNE_plot,
                                      GR_plot,
-                                     GRA_plot,
+                                     GRNE_plot,
                                      GT_plot,
-                                     GTA_plot,
-                                     GA_plot,
+                                     GTNE_plot,
+                                     GNE_plot,
                                      ncol = 2, nrow = 4, 
-                                     labels=c("G","GS","GSA","GR","GRA","GT",
-                                              "GTA","GA"))
+                                     labels=c("G","GS","GSNE","GR","GRNE","GT",
+                                              "GTNE","GNE"))
 ggsave("Inlabru_outputs/Intensity_plots.png", Intensity_plots,
        width = 7, height = 7.8, units = "in",
        dpi = 600
@@ -903,12 +941,12 @@ resid_plots <- list()
 
 model_resids_list <- list(G_model, 
                    GS_model,
-                   GSA_model,
+                   GSNE_model,
                    GR_model,
-                   GRA_model,
+                   GRNE_model,
                    GT_model,
-                   GTA_model,
-                   GA_model
+                   GTNE_model,
+                   GNE_model
 )
 
 # loop through models
@@ -963,12 +1001,12 @@ ggsave("Inlabru_outputs/Resid_plots.png", resid_plots,
 
 CRPS_list <- list(G_pred,
                   GS_pred,
-                  GSA_pred,
+                  GSNE_pred,
                   GR_pred,
-                  GRA_pred,
+                  GRNE_pred,
                   GT_pred,
-                  GTA_pred,
-                  GA_pred
+                  GTNE_pred,
+                  GNE_pred
 )
 
 # observed counts
@@ -981,7 +1019,7 @@ compute_crps <- function(pred_obj) {
   as.list(summary(crps_values))
 }
 
-model_names <- c("G", "GS", "GSA", "GR", "GRA", "GT", "GTA", "GA")
+model_names <- c("G", "GS", "GSNE", "GR", "GRNE", "GT", "GTNE", "GNE")
 crps_summary_list <- lapply(CRPS_list, compute_crps)
 
 # table of crps values
@@ -996,12 +1034,12 @@ plot(crps_plot)
 
 logscore_list <- list(G_expected,
                       GS_expected,
-                      GSA_expected,
+                      GSNE_expected,
                       GR_expected,
-                      GRA_expected,
+                      GRNE_expected,
                       GT_expected,
-                      GTA_expected,
-                      GA_expected
+                      GTNE_expected,
+                      GNE_expected
 )
 
 compute_logscore <- function(expected_obj) {
