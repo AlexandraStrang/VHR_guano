@@ -11,6 +11,8 @@ library(car) # for VIF values
 library(nlme) # Use REML for low sample sizes
 library(performance) # can't use vif for lmm
 
+setwd("C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD/Data/Data sheets")
+
 # Read in data
 Dataset.1.0 <- read.csv("Merged_masterdata.csv")
 
@@ -832,7 +834,7 @@ anova(Feb_model, AR1_Feb)
 # no evidence that adding the AR(1) structure improves model fit
 
 ##########################################################################
-# GA and BP relationship (model created in Strang MSc thesis)
+# GA and BP relationship (model created in Strang MSc thesis - Strang et al. 2025 RSEC)
 ##########################################################################
 
 # update to include all 15 colonies
@@ -846,8 +848,6 @@ View(Dataset.2.0)
 Dataset.2.0$Analysis2[Dataset.2.0$Analysis2 == ""] <- NA
 Dataset.2.0$Analysis2[Dataset.2.0$Analysis2 == "NA"] <- NA
 sum(is.na(Dataset.2.0$Analysis2))
-
-# Condense/ remove analysis column
 
 # Remove NAs
 Dataset.2.1 <- na.omit(Dataset.2.0)
@@ -1021,3 +1021,21 @@ BP_preds <- ggplot(Dataset.1.5, aes(x = Day_D1, y = BP_Pred, group = Colony_code
 
 BP_preds
 # need to determine if change in predicted BP is large enough to care?
+
+##########################################################################
+# Create Supplementary Information table of GA and BP data
+##########################################################################
+
+# Read in data
+Dataset.3.0 <- read.csv("GA_BP_Table.csv")
+
+library(knitr)
+
+kable(Data_matrix, format = "latex", caption = "Table of breeding pair (BP) and guano area (GA; m$^{2}$) estimates for 16 Ad\'{e}lie penguin colonies in the Ross Sea, Antarctica. 
+      The number of breeding pairs was estimated through aerial census. The area of guano was estimated from satellite imagery. Included is
+      the austral summer season, the image date (yyyymmdd), ID, and sensor.", label = "GA_BP")
+# requires some editing to correct formatting
+# column headers
+# commas in GA and BP data
+# remove NAs?
+# rules rather than hline
