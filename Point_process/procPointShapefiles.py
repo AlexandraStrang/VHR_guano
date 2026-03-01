@@ -5,33 +5,29 @@ import os
 import pandas as pd
 from osgeo import ogr, osr
 
-# use PPP_conda_env in NeSI
+# previously used with PPP_conda_env in NeSI
+# pgc_test env works
+
 
 class Params:
     def __init__(self):
         # DATA FOLDER
-        self.inputDataPath = r"/nesi/project/landcare04225/Alexandra_Data"
+        self.inputDataPath = r"C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD\Data/Inlabru/Inlabru_data/"
         
-        self.terrain_folder = os.path.join(self.inputDataPath, 'colony_terrain_rasters')
+        self.terrain_folder = os.path.join(self.inputDataPath, 'Crozier_terrain_mesh')
 
         # DEM FILE AND POINT SHAPEFILE
-        self.RoydsDEMFName = os.path.join(self.terrain_folder, 'Cape_Royds',
-            'Cape_Royds_clipped.tif')
-        self.RoydsPointsFName = os.path.join(self.inputDataPath, '2020_UAV_points',
-            'royd_masked_labels_cleaned_coords_added_2020-12-01',
-            'royd_masked_labels_cleaned_coords_added_2020-12-01.shp')
-        
-        self.CrozierDEMFName = os.path.join(self.terrain_folder, 'Cape_Crozier',
-            'Cape_Crozier_clipped.tif')
-        self.CrozierPointsFName = os.path.join(self.inputDataPath, '2020_UAV_points',
-            'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29',
-            'Edit_croz_masked_labels_cleaned_coords_added_2020-11-29.shp')
+        self.CrozierDEMFName = os.path.join(self.terrain_folder, 'Cape_Crozier_clipped.tif')
+        self.Crozier_2019PointsFName = os.path.join(self.inputDataPath, 'Crozier_UAV_points',
+            '2019-12-02','masked_labels_cleaned_coords_added.shp')
+        self.Crozier_2020PointsFName = os.path.join(self.inputDataPath, 'Crozier_UAV_points',
+            '2020-11-29','masked_labels_cleaned_coords_added.shp')
  
         # OUTPUT DATA PATHS AND FILENAMES
-        self.outputDataPath = os.path.join(os.getenv('ADELIEPROJDIR', default = '.'), 
-            'Alexandra_Data', 'point_process_data')
+        self.outputDataPath = os.path.join(self.inputDataPath, 'Crozier_UAV_points',
+                                           'Reprojected_3031')
  
-        self.colonies = ['Royds', 'Crozier']
+        self.colonies = ['Crozier_2020', 'Crozier_2019']  # ability to add other colonies here
 
 
 class DataProcessor:
@@ -54,7 +50,7 @@ class DataProcessor:
         """
         for col in self.params.colonies:
             # GET DATA NAMES AND PATHS
-            demFName = getattr(self.params, f'{col}DEMFName')
+            demFName = getattr(self.params, 'CrozierDEMFName')  # would need to be adjusted for other colonies
             ptShpFName = getattr(self.params, f'{col}PointsFName')
             print(f'demFName: {demFName}, shp name: {ptShpFName}')
 
@@ -82,7 +78,7 @@ class DataProcessor:
             df = pd.DataFrame({"x": x_list, "y": y_list})
 
             # WRITE CSV
-            csv_path = os.path.join(self.params.outputDataPath, f'{col}_Points_2020_3031.csv')
+            csv_path = os.path.join(self.params.outputDataPath, f'{col}_Points_3031.csv')
             df.to_csv(csv_path, index=False)
             print(f'Saved: {csv_path}')
 
