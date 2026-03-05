@@ -1,4 +1,4 @@
-# Intra-seasonal variation and factors influencing satellite-derived population indices of Adélie penguins
+# Intra-seasonal variation and factors influencing satellite-derived population indices of Adélie penguins in the Ross Sea
 
 ## Overview:
 This work represents the first chapter of my doctoral research at the University of Canterbury, New Zealand. We aimed to investigate the intra-seasonal variation and factors influencing satellite-derived population indices of Adélie penguins. As such, we aimed to refine the utility of using Very High-Resolution satellite (VHR) imagery for monitoring Adélie penguins. 
