@@ -5,7 +5,7 @@ The scripts for completing analysis in Strang et al. (in prep).
 Inlabru model analyses:
 - `Inlabru_mesh.R`: This script contains the R code used to construst the 2D triangulated mesh.
 - `Inlabru_candidates.R`: This script contains the R code to run 8 candidate models.
-- - `Inlabru_test.R`: This script contains the R code to run the Poisson GLM.
+- `Inlabru_test.R`: This script contains the R code to run the Poisson GLM.
 
 Old:
 - `LGCP_Nesi.R`: This script contains the R code currently being developed and run on NeSI - 20250910.
