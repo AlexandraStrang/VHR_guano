@@ -3,15 +3,15 @@
 # created: 2025
 
 # set working directory
-setwd("C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
-#setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
+#setwd("C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
+setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
 
 # load packages 
 library(sf)
 library(fmesher)
 library(ggplot2)
 library(INLA) # version 25.09.19
-library(inlabru) # for bru() version 2.13.0 (currently using 2.13.0.9004?)
+library(inlabru) # for bru() version 2.13.0
 library(dplyr)
 library(purrr)
 library(tidyr)
@@ -155,8 +155,7 @@ cov_stack <- c(percent_guano_raster, slope_raster, northness_raster, eastness_ra
 
 # check for colinearity between covariates
 cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
-
-cor(cov_values) # need to do upon re-run
+cor(cov_values)
 
 # prepare response variable
 count_raster <- 
@@ -184,7 +183,6 @@ print(total_zero_area)
 
 total_raster_area <- global(cell_areas, fun = "sum", na.rm = TRUE)
 print(total_raster_area)
-
 # total - zero area = 585,594 m2 (area with penguins)
 
 # extract the coordinates for these pixels
@@ -722,7 +720,7 @@ for (i in seq_along(model_list)) {
         WAIC = WAIC,
         DIC = DIC,
         MLik = MLik,
-        stringsasFactors = FALSE
+        stringsAsFactors = FALSE
       )
       
       results_list[[length(results_list) + 1]] <- effect_row
@@ -752,8 +750,8 @@ a_pred_df <- abundance_df %>%
   select(Model, predicted_abundance) %>%
   distinct()
 
-observed_n <- 246017 # use Ballard and Schmidt 2020 count
-#observed_n <- nrow(Crozier_xy)
+observed_n <- nrow(Crozier_xy)
+# 249,007 UAV xy points
 
 abundance_plot <- ggplot(a_pred_df, aes(x = Model, y = predicted_abundance)) +
   geom_point(size = 3, color = "black") +
@@ -761,9 +759,9 @@ abundance_plot <- ggplot(a_pred_df, aes(x = Model, y = predicted_abundance)) +
   scale_linetype_manual(name = "", values = c("Observed" = "dashed")) +
   labs(
     x = "Model",
-    y = "Predicted count"
+    y = "Predicted count (BP)"
     ) +
-  scale_y_continuous(limits = c(245000, 252000)) +
+  scale_y_continuous(limits = c(247500, 257500)) +
   theme_minimal() +
   theme(legend.position = "right") 
 
@@ -786,8 +784,8 @@ difference_plot <- ggplot(diff_df, aes(x = Model, y = difference)) +
   geom_point(size = 3, color = "black") +
   labs(
     x = "Model",
-    y = "Predicted - observed count") +
-  scale_y_continuous(limits = c(5000, 5600)) +
+    y = "Predicted - observed count (BP)") +
+  scale_y_continuous(limits = c(5500, 6500)) +
   theme_minimal()
 
 difference_plot
@@ -826,12 +824,16 @@ for (m in unique(models_to_plot$Model)) {
   
   plot_list[[m]] <- p
 }
+
 effects_plots <- ggpubr::ggarrange(plotlist = plot_list, ncol = 4, nrow = 2,
                                    common.legend = TRUE,
                                    legend = "right")
 effects_plots <- annotate_figure(effects_plots,
     left = text_grob("Effect", rot = 90, vjust = 1, face = "bold"),
     bottom = text_grob("Mean", face = "bold"))
+
+effects_plots
+
 ggexport(effects_plots, filename = "Inlabru_outputs/Effects_plots.png",
        width = 9600, height = 4800, units = "in",
        res = 600
@@ -842,6 +844,7 @@ G_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(G_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/G_predictions.png", G_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -851,6 +854,7 @@ GS_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GS_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/GS_predictions.png", GS_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -860,6 +864,7 @@ GSNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GSNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/GSNE_predictions.png", GSNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -869,6 +874,7 @@ GR_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GR_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/GR_predictions.png", GR_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -878,6 +884,7 @@ GRNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GRNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/GRNE_predictions.png", GRNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -887,6 +894,7 @@ GT_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GT_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/GT_predictions.png", GT_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -896,6 +904,7 @@ GTNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GTNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/GTNE_predictions.png", GTNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -905,6 +914,7 @@ GNE_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(GNE_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/GNE_predictions.png", GNE_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -914,6 +924,7 @@ N_plot <- ggplot() +
   geom_fm(data = mesh_sub) +
   gg(N_expected, aes(fill = mean / area), geom = "tile") +
   ggtitle("Nest intensity per m2")
+
 ggsave("Inlabru_outputs/N_predictions.png", N_plot,
        width = 8, height = 5, units = "in",
        dpi = 600
@@ -930,12 +941,16 @@ Intensity_plots <- ggpubr::ggarrange(G_plot,
                                      ncol = 2, nrow = 4, 
                                      labels=c("G","GS","GSNE","GR","GRNE","GT",
                                               "GTNE","GNE"))
+
+Intensity_plots
+
 ggsave("Inlabru_outputs/Intensity_plots.png", Intensity_plots,
        width = 7, height = 7.8, units = "in",
        dpi = 600
 )
 
 # Plot pearsons residuals for each model
+
 residuals_list <- list()
 resid_plots <- list()
 
@@ -991,6 +1006,9 @@ for (i in seq_along(model_resids_list)) {
 }
 
 resid_plots <- ggpubr::ggarrange(plotlist = resid_plots, ncol = 2, nrow = 4)
+
+resid_plots
+
 ggsave("Inlabru_outputs/Resid_plots.png", resid_plots,
        width = 7, height = 8, units = "in",
        dpi = 600
@@ -1030,7 +1048,7 @@ crps_table <- bind_rows(crps_summary_list) %>%
 crps_plot <- ggtexttable(crps_table, rows = NULL)
 plot(crps_plot)
 
-# add log-score values for checking predictive preformace
+# add log-score values for checking predictive performance
 
 logscore_list <- list(G_expected,
                       GS_expected,
