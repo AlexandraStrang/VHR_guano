@@ -1,16 +1,10 @@
 ## Contains:
 
-The scripts for completing analysis in Strang et al. (in prep).
+The scripts for completing analysis to address question 2 in Strang et al. (in prep).
 
 Inlabru model analyses:
-- `Inlabru_test.R`: This script contains the R code to run the Poisson GLM.
-- `Inlabru_candidates.R`: This script contains the R code to run 8 candidate models.
 - `Inlabru_mesh.R`: This script contains the R code used to construst the 2D triangulated mesh.
-
-Old:
-- `LGCP_Nesi.R`: This script contains the R code currently being developed and run on NeSI - 20250910.
-- `LGCP_test.R`: NEEDS UPDATING This script contains the R code for testing model sensitivity to the SPDE priors.
-- `LGCP_analysis.RMD`: NEEDS UPDATING
+- `Inlabru_candidates.R`: This script contains the R code to run 8 candidate models.
 
 Pre-processing analyses:
 - `getAnalysisData.py`: NOT COMPLETE/ NOT USED

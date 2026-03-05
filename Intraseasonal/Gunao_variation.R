@@ -1021,21 +1021,3 @@ BP_preds <- ggplot(Dataset.1.5, aes(x = Day_D1, y = BP_Pred, group = Colony_code
 
 BP_preds
 # need to determine if change in predicted BP is large enough to care?
-
-##########################################################################
-# Create Supplementary Information table of GA and BP data
-##########################################################################
-
-# Read in data
-Dataset.3.0 <- read.csv("GA_BP_Table.csv")
-
-library(knitr)
-
-kable(Data_matrix, format = "latex", caption = "Table of breeding pair (BP) and guano area (GA; m$^{2}$) estimates for 16 Ad\'{e}lie penguin colonies in the Ross Sea, Antarctica. 
-      The number of breeding pairs was estimated through aerial census. The area of guano was estimated from satellite imagery. Included is
-      the austral summer season, the image date (yyyymmdd), ID, and sensor.", label = "GA_BP")
-# requires some editing to correct formatting
-# column headers
-# commas in GA and BP data
-# remove NAs?
-# rules rather than hline
