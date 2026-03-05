@@ -7,7 +7,6 @@ Inlabru model analyses:
 - `Inlabru_candidates.R`: This script contains the R code to run 8 candidate models.
 
 Pre-processing analyses:
-- `getAnalysisData.py`: NOT COMPLETE/ NOT USED
 - `procGuanoTerrain.py`: This script contains the python code to turn guano raster into percent cover at 2X2 m resolution.
 - `procPointShapefiles.py`: This script contains the R code to turn UAV penguin points into xy data in EPSG:3031.
 - `procUAVOrtho`: This folder contains the workflow to turn the UAV orthomosaic image into a shapefile/ polygon.
