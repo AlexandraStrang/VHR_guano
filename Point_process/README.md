@@ -1,6 +1,6 @@
 ## Contains:
 
-The scripts for completing analysis in Strang et al. (in prep).
+The scripts for completing analysis to address question 2 in Strang et al. (in prep).
 
 Inlabru model analyses:
 - `Inlabru_mesh.R`: This script contains the R code used to construst the 2D triangulated mesh.
