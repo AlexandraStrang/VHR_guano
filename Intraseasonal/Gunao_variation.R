@@ -7,11 +7,11 @@ library(ggplot2)
 library(ggpubr)
 library(dplyr)
 library(corrplot)
-library(car) # for VIF values
+library(MuMIn) # for AICc scores
 library(nlme) # Use REML for low sample sizes
 library(performance) # can't use vif for lmm
 
-setwd("C:/Users/astra/OneDrive - University of Canterbury/ANTA - PhD/Data/Data sheets")
+setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Data sheets")
 
 # Read in data
 Dataset.1.0 <- read.csv("Merged_masterdata.csv")
@@ -284,173 +284,17 @@ corrplot(cor.matrix, method = "number", type = "lower", tl.cex = 1)
 # plot
 
 # correlated variables of greater than +/- 0.50
-# sun elevation and days since December first correlated - expected
-# check correlations with vif analysis too
-
-##########################################################################
-# Build base model with satellite-related factors
-##########################################################################
-
-# non-log base model without random effect of colony
-base_model <- lm(Dataset.1.4$GA ~ Dataset.1.4$Day_D1 + Dataset.1.4$MEANCOLLECTEDGSD + 
-                   Dataset.1.4$MEANSUNAZ + Dataset.1.4$MEANSUNEL +
-                   Dataset.1.4$MEANOFFNADIRVIEWANGLE)
-
-summary(base_model) # too many parameters for the no. of observations
-
-# Day since Dec 1 is an integer = not continuous
-vif(base_model) # based on vif remove SUNEL or Day_D1
-
-# check residuals
-par(mfrow = c(2,2))
-plot(base_model)
-
-Dataset.1.4$fittedbase <- fitted(base_model)
-Dataset.1.4$residbase <- resid(base_model)
-
-Resids_base <- ggplot(Dataset.1.4, aes(x=fittedbase, y=residbase, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
-  geom_point(size=3) + 
-  geom_hline(yintercept = 0) + 
-  xlab("Observed") + 
-  ylab("Residuals") + 
-  scale_shape_manual(values = c(21,21,21)) +
-  scale_fill_manual(values = colours) +
-  scale_colour_manual(values = colours) +
-  theme_classic() +
-  theme(axis.text.x = element_text(colour = 'black', size=12),
-        axis.text.y = element_text(colour = 'black', size=12),) + 
-  scale_y_continuous(limits = c(-400000,400000), breaks = seq(-400000,400000, by=50000))
-
-Resids_base
-# resid pattern as it doesn't account for colony effect
-
-# try log guano area due to colonies of different sizes and pattern in resids
-Dataset.1.4$Log_GA <- log(Dataset.1.4$GA)
-
-log_base_model <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$Day_D1 + Dataset.1.4$MEANCOLLECTEDGSD + 
-                   Dataset.1.4$MEANSUNAZ + Dataset.1.4$MEANSUNEL +
-                   Dataset.1.4$MEANOFFNADIRVIEWANGLE)
-
-summary(log_base_model)
-vif(log_base_model) # based on vif remove SUNEL or Day_D1
-
-# check residuals
-par(mfrow = c(2,2))
-plot(log_base_model)
-
-Dataset.1.4$fittedlog <- fitted(log_base_model)
-Dataset.1.4$residlog <- resid(log_base_model)
-
-Resids_log <- ggplot(Dataset.1.4, aes(x=fittedlog, y=residlog, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
-  geom_point(size=3) + 
-  geom_hline(yintercept = 0) + 
-  xlab("Observed") + 
-  ylab("Residuals") + 
-  scale_shape_manual(values = c(21,21,21)) +
-  scale_fill_manual(values = colours) +
-  scale_colour_manual(values = colours) +
-  theme_classic() +
-  theme(axis.text.x = element_text(colour = 'black', size=12),
-        axis.text.y = element_text(colour = 'black', size=12),) + 
-  scale_y_continuous(limits = c(-2.0,2.0), breaks = seq(-2.0, 2.0, by=0.2))
-
-Resids_log
-# also doesn't account for colony effect
-# spread of residuals is huge (1.0 to -1.2)
-
-# Include random effect of colony
-
-# base mixed-effects model
-log_base_lmm <- lme(
-  fixed = Log_GA ~ Day_D1 + MEANCOLLECTEDGSD + MEANSUNAZ + MEANSUNEL + MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(log_base_lmm) #check other correlations
-anova(log_base_lmm)
-
-check_collinearity(log_base_lmm)
-# remove Days since December 1st (correlated with sun el)
-# days since December first may be significant
-# colonies of different sizes are significantly different
-
-# check residuals
-par(mfrow = c(1,1))
-plot(log_base_lmm)
-
-Dataset.1.4$fittedlmm <- fitted(log_base_lmm)
-Dataset.1.4$residlmm <- resid(log_base_lmm)
-
-Resids_lmm <- ggplot(Dataset.1.4, aes(x=fittedlmm, y=residlmm, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
-  geom_point(size=3) + 
-  geom_hline(yintercept = 0) + 
-  xlab("Observed") + 
-  ylab("Residuals") + 
-  scale_shape_manual(values = c(21,21,21)) +
-  scale_fill_manual(values = colours) +
-  scale_colour_manual(values = colours) +
-  theme_classic() +
-  theme(axis.text.x = element_text(colour = 'black', size=12),
-        axis.text.y = element_text(colour = 'black', size=12),) + 
-  scale_y_continuous(limits = c(-1.0,1.0), breaks = seq(-1.0, 1.0, by=0.2))
-
-Resids_lmm
-# resids look okay?
-
-# Try AR(1) - auto regressive error structure (points will be correlated to the previous points)
-# with random effect of colony
-AR1_Model <- lme(
-  fixed = Log_GA ~ Day_D1 + MEANCOLLECTEDGSD + MEANSUNAZ + MEANSUNEL + MEANOFFNADIRVIEWANGLE, # or try null 
-  random = ~ 1 | Colony_code, # random effect
-  data = Dataset.1.4, 
-  correlation = corAR1(form = ~ Day_D1 | Colony_code) # AR(1) correlation within colonies over time
-) 
-
-summary(AR1_Model) 
-# Phi1 = 0 (means there is no autocorrelation)
-# phi1 is zero indicating that auto regressive error structure isn't needed
-# no auto regressive correlation is detected 
-
-anova(log_base_lmm, AR1_Model)
-# model without autoregressive structure is better 
-# no evidence that adding the AR(1) structure improves model fit
-
-# check residuals
-qqnorm(resid(AR1_Model))  # Q-Q plot for residuals
-qqline(resid(AR1_Model))  # reference line
-
-Dataset.1.4$fittedAR <- fitted(AR1_Model)
-Dataset.1.4$residAR <- resid(AR1_Model)
-
-ResidsAR <- ggplot(Dataset.1.4, aes(x=fittedAR, y=residAR, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
-  geom_point(size=3) + 
-  geom_hline(yintercept = 0) + 
-  xlab("Observed") + 
-  ylab("Residuals") + 
-  scale_shape_manual(values = c(21,21,21)) +
-  scale_fill_manual(values = colours) +
-  scale_colour_manual(values = colours) +
-  theme_classic() +
-  theme(axis.text.x = element_text(colour = 'black', size=12),
-        axis.text.y = element_text(colour = 'black', size=12),) + 
-  scale_y_continuous(limits = c(-1.0,1.0), breaks = seq(-1.0, 1.0, by=0.2))
-
-ResidsAR
-# look okay
-
-acf(resid(AR1_Model))
-# no autocorrelation
-# check again with top model
+# sun elevation and days since December first correlated = expected
+# different hypotheses - but do not include in same models
 
 ##########################################################################
 # Build candidate models with satellite-related factors
 ##########################################################################
 
-# compare to log_base_lmm
 # include only max of two covariates
-# need to use subsets of base model excluding collinear variables
-
-# removed days since December 1st first?
+# excluding collinear variables
+# fit by ML to compare candidate models
+# use variance structure by colony to account for differences 
 
 # single fixed-effects
 
@@ -458,10 +302,10 @@ acf(resid(AR1_Model))
 log_reduced1_lmm <- lme(
   fixed = Log_GA ~ MEANOFFNADIRVIEWANGLE,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced1_lmm)
-anova(log_reduced1_lmm)
 M1_AIC <- AIC(log_reduced1_lmm)
 M1_AICc <- AICc(log_reduced1_lmm)
 
@@ -469,10 +313,10 @@ M1_AICc <- AICc(log_reduced1_lmm)
 log_reduced2_lmm <- lme(
   fixed = Log_GA ~ MEANCOLLECTEDGSD,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced2_lmm)
-anova(log_reduced2_lmm)
 M2_AIC <- AIC(log_reduced2_lmm)
 M2_AICc <- AICc(log_reduced2_lmm)
 
@@ -480,10 +324,10 @@ M2_AICc <- AICc(log_reduced2_lmm)
 log_reduced3_lmm <- lme(
   fixed = Log_GA ~ MEANSUNAZ,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced3_lmm)
-anova(log_reduced3_lmm)
 M3_AIC <- AIC(log_reduced3_lmm)
 M3_AICc <- AICc(log_reduced3_lmm)
 
@@ -491,25 +335,24 @@ M3_AICc <- AICc(log_reduced3_lmm)
 log_reduced4_lmm <- lme(
   fixed = Log_GA ~ MEANSUNEL,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced4_lmm)
-anova(log_reduced4_lmm)
 M4_AIC <- AIC(log_reduced4_lmm)
 M4_AICc <- AICc(log_reduced4_lmm)
-# best model so far
 
-# Day_d1 model ?????
+# Day_d1 model
 log_reduced5_lmm <- lme(
   fixed = Log_GA ~ Day_D1,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced5_lmm)
-anova(log_reduced5_lmm)
 M5_AIC <- AIC(log_reduced5_lmm)
 M5_AICc <- AICc(log_reduced5_lmm)
-# sun el model better
+# same as sun el model
 
 # 9 candidate models with two fixed effects
 
@@ -517,10 +360,10 @@ M5_AICc <- AICc(log_reduced5_lmm)
 log_reduced6_lmm <- lme(
   fixed = Log_GA ~ MEANCOLLECTEDGSD + MEANOFFNADIRVIEWANGLE,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced6_lmm)
-anova(log_reduced6_lmm)
 M6_AIC <- AIC(log_reduced6_lmm)
 M6_AICc <- AICc(log_reduced6_lmm)
 
@@ -528,10 +371,10 @@ M6_AICc <- AICc(log_reduced6_lmm)
 log_reduced7_lmm <- lme(
   fixed = Log_GA ~ MEANSUNEL + MEANOFFNADIRVIEWANGLE,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced7_lmm)
-anova(log_reduced7_lmm)
 M7_AIC <- AIC(log_reduced7_lmm)
 M7_AICc <- AICc(log_reduced7_lmm)
 
@@ -539,10 +382,10 @@ M7_AICc <- AICc(log_reduced7_lmm)
 log_reduced8_lmm <- lme(
   fixed = Log_GA ~ MEANSUNAZ + MEANOFFNADIRVIEWANGLE,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced8_lmm)
-anova(log_reduced8_lmm)
 M8_AIC <- AIC(log_reduced8_lmm)
 M8_AICc <- AICc(log_reduced8_lmm)
 
@@ -550,10 +393,10 @@ M8_AICc <- AICc(log_reduced8_lmm)
 log_reduced9_lmm <- lme(
   fixed = Log_GA ~ MEANSUNEL + MEANCOLLECTEDGSD,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced9_lmm)
-anova(log_reduced9_lmm)
 M9_AIC <- AIC(log_reduced9_lmm)
 M9_AICc <- AICc(log_reduced9_lmm)
 
@@ -561,21 +404,23 @@ M9_AICc <- AICc(log_reduced9_lmm)
 log_reduced10_lmm <- lme(
   fixed = Log_GA ~ MEANSUNEL + MEANSUNAZ,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced10_lmm)
-anova(log_reduced10_lmm)
 M10_AIC <- AIC(log_reduced10_lmm)
 M10_AICc <- AICc(log_reduced10_lmm)
+
+cor(Dataset.1.4$MEANSUNEL, Dataset.1.4$MEANSUNAZ)
 
 # gsd and sun az model
 log_reduced11_lmm <- lme(
   fixed = Log_GA ~ MEANCOLLECTEDGSD + MEANSUNAZ,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced11_lmm)
-anova(log_reduced11_lmm)
 M11_AIC <- AIC(log_reduced11_lmm)
 M11_AICc <- AICc(log_reduced11_lmm)
 
@@ -583,42 +428,49 @@ M11_AICc <- AICc(log_reduced11_lmm)
 log_reduced12_lmm <- lme(
   fixed = Log_GA ~ Day_D1 + MEANCOLLECTEDGSD,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced12_lmm)
-anova(log_reduced12_lmm)
+M12_AIC <- AIC(log_reduced12_lmm)
+M12_AICc <- AICc(log_reduced12_lmm)
 
 # Day_D1 and sun az model
 log_reduced13_lmm <- lme(
   fixed = Log_GA ~ Day_D1 + MEANSUNAZ,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced13_lmm)
-anova(log_reduced13_lmm)
+M13_AIC <- AIC(log_reduced13_lmm)
+M13_AICc <- AICc(log_reduced13_lmm)
 
 # Day_D1 and off-nadir model
 log_reduced14_lmm <- lme(
   fixed = Log_GA ~ Day_D1 + MEANOFFNADIRVIEWANGLE,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(log_reduced14_lmm)
-anova(log_reduced14_lmm)
+M14_AIC <- AIC(log_reduced14_lmm)
+M14_AICc <- AICc(log_reduced14_lmm)
+
+# Day_D1 and sun el in same model? (VIF check)
 
 # null model
 null_model <- lme(
   fixed = Log_GA ~ 1,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(null_model)
-anova(null_model)
 null_AIC <- AIC(null_model)
 null_AICc <- AICc(null_model)
 
-anova(null_model, log_reduced4_lmm)
-# null model better?
+# removed days since December 1st?
 
 # model selection using mumin (without null)
 model_list <- list(log_reduced1_lmm, log_reduced2_lmm, log_reduced3_lmm, log_reduced4_lmm, 
@@ -627,16 +479,12 @@ model_list <- list(log_reduced1_lmm, log_reduced2_lmm, log_reduced3_lmm, log_red
                    log_reduced13_lmm, log_reduced14_lmm)
 model_selection <- model.sel(model_list) # default rank AICc
 model_selection
-# single fixed effects model rank highest
-# null would be ranked higher with highest weight
 
 # model averaging
 avg_model <- model.avg(model_selection, subset = delta < 2) # models with 2 delta AICc
 summary(avg_model)
 # full average for conservative estimates - should variable be in model at all
 # conditional average for effect size - if it is present in the model
-
-# do i need to exlcude day d1?
 
 # calculate delta AICc scores and weights
 
@@ -678,7 +526,7 @@ Dataset.1.4$residbest <- resid(log_reduced4_lmm)
 Best_resids <- ggplot(Dataset.1.4, aes(x=fittedbest, y=residbest, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
   geom_hline(yintercept = 0) + 
-  xlab("Observed") + 
+  xlab("Fitted") + 
   ylab("Residuals") + 
   scale_shape_manual(values = c(21,21,21)) +
   scale_fill_manual(values = colours) +
@@ -701,7 +549,7 @@ Dataset.1.4$residnull <- resid(null_model)
 null_resids <- ggplot(Dataset.1.4, aes(x=fittednull, y=residnull, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
   geom_hline(yintercept = 0) + 
-  xlab("Observed") + 
+  xlab("Fitted") + 
   ylab("Residuals") + 
   scale_shape_manual(values = c(21,21,21)) +
   scale_fill_manual(values = colours) +
@@ -758,16 +606,15 @@ summary(anova_model)
 Feb_model <- lme(
   fixed = Log_GA ~ Feb_effect,
   random = ~ 1 | Colony_code,
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  method  = "ML",
 )
-summary(Feb_model)
-anova(Feb_model)
 Feb_AIC <- AIC(Feb_model)
 Feb_AICc <- AICc(Feb_model)
 
 anova(null_model, Feb_model)
 # Feb effect model is better
-# Suggests that the last two data points are higher than the rest
 
 # AICc
 x <- c(Feb_AICc, null_AICc, M4_AICc, M1_AICc, M2_AICc)
@@ -804,7 +651,7 @@ Dataset.1.4$residfeb <- resid(Feb_model)
 Feb_resids <- ggplot(Dataset.1.4, aes(x=fittedfeb, y=residfeb, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
   geom_hline(yintercept = 0) + 
-  xlab("Observed") + 
+  xlab("Fitted") + 
   ylab("Residuals") + 
   scale_shape_manual(values = c(21,21,21)) +
   scale_fill_manual(values = colours) +
@@ -832,6 +679,111 @@ acf(resid(AR1_Feb))
 anova(Feb_model, AR1_Feb)
 # model without autoregressive structure is better 
 # no evidence that adding the AR(1) structure improves model fit
+
+# build in variance structure to account for resdidual variance differing by colony
+
+# heteroscedastic model
+Feb_model2 <- lme(
+  fixed = Log_GA ~ Feb_effect,
+  random = ~ 1 | Colony_code,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  data = Dataset.1.4
+)
+summary(Feb_model2)
+
+# compare homoscedastic vs heteroscedastic model
+anova(Feb_model, Feb_model2)
+
+# Variance structure Feb model resids
+qqnorm(resid(Feb_model2))  # Q-Q plot for residuals
+qqline(resid(Feb_model2))  # reference line
+# pattern?
+
+Dataset.1.4$fittedfeb2 <- fitted(Feb_model2)
+Dataset.1.4$residfeb2 <- resid(Feb_model2)
+
+Feb_resids2 <- ggplot(Dataset.1.4, aes(x=fittedfeb2, y=residfeb2, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
+  geom_point(size=3) + 
+  geom_hline(yintercept = 0) + 
+  xlab("Fitted") + 
+  ylab("Residuals") + 
+  scale_shape_manual(values = c(21,21,21)) +
+  scale_fill_manual(values = colours) +
+  scale_colour_manual(values = colours) +
+  theme_classic() +
+  theme(axis.text.x = element_text(colour = 'black', size=12),
+        axis.text.y = element_text(colour = 'black', size=12),) + 
+  scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
+
+Feb_resids2
+# resids show Adare spreads most as predicted by model structure
+
+Dataset.1.4$fitted_feb2   <- fitted(Feb_model2)
+Dataset.1.4$norm_resid    <- resid(Feb_model2, type = "normalized")
+Dataset.1.4$pearson_resid <- resid(Feb_model2, type = "pearson")
+
+# normalized residuals vs Fitted
+ggplot(Dataset.1.4, aes(x = fitted_feb2, y = norm_resid, colour = Colony_code)) +
+  geom_hline(yintercept = 0, linewidth = 0.3) +
+  geom_point(size = 3) +
+  labs(x = "Fitted (log GA)", y = "Normalized residuals") +
+  theme_classic()
+# normalised residuals show that spread is even (variance structure accounts for the colony-specific standard deviations)
+
+
+
+
+
+
+# Top candidate models with colony variance structure
+# for model coefficients table use REML method
+# single fixed-effects
+
+# off-nadir model
+log_reduced1_lmm <- lme(
+  fixed = Log_GA ~ MEANOFFNADIRVIEWANGLE,
+  random = ~ 1 | Colony_code,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  data = Dataset.1.4
+)
+summary(log_reduced1_lmm)
+
+# gsd model
+log_reduced2_lmm <- lme(
+  fixed = Log_GA ~ MEANCOLLECTEDGSD,
+  random = ~ 1 | Colony_code,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  data = Dataset.1.4
+)
+summary(log_reduced2_lmm)
+
+# sun el model
+log_reduced4_lmm <- lme(
+  fixed = Log_GA ~ MEANSUNEL,
+  random = ~ 1 | Colony_code,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  data = Dataset.1.4
+)
+summary(log_reduced4_lmm)
+
+# Feb effect model
+Feb_model <- lme(
+  fixed = Log_GA ~ Feb_effect,
+  random = ~ 1 | Colony_code,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  data = Dataset.1.4
+)
+summary(Feb_model)
+
+# null model
+null_model <- lme(
+  fixed = Log_GA ~ 1,
+  random = ~ 1 | Colony_code,
+  weights = varIdent(form = ~ 1 | Colony_code),
+  data = Dataset.1.4
+)
+summary(null_model)
+
 
 ##########################################################################
 # GA and BP relationship (model created in Strang MSc thesis - Strang et al. 2025 RSEC)
