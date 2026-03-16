@@ -12,7 +12,7 @@ import numpy as np
 import csv
 from dbfread import DBF
 
-# directories and paths
+# directories and paths (on SEE hard-drive)
 raster_folder = r"D:\Guano_rasters"
 vat_path = r"D:\Guano_rasters\VAT_guano_rasters"
 output_csv = r"D:\Guano_rasters\raster_classes.csv"
