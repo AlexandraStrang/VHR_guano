@@ -92,6 +92,7 @@ mesh_plot_Crozier <- ggplot() +
 # geom_sf converts to degrees
 
 mesh_plot_Crozier
+
 ggsave("Inlabru_outputs/Mesh_plot.png", mesh_plot_Crozier,
        width = 8, height = 5, units = "in",
        dpi = 600
