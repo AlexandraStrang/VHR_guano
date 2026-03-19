@@ -24,12 +24,11 @@ bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
 # Load data
 ##############################################################################################
 
-# mesh and coastline boundary
-mesh_sub <- readRDS("Inlabru_outputs/mesh_sub.rds")
-buff_boundary <- readRDS("Inlabru_outputs/buff_boundary.rds")
-
 # 2020 count dataframe created in inlabru candidates
 counts_df     <- readRDS("Inlabru_outputs/counts_df.rds")
+
+# coastline boundary
+buff_boundary <- readRDS("Inlabru_outputs/buff_boundary.rds")
 
 ##############################################################################################
 # Load models
@@ -43,7 +42,6 @@ GRNE_model <- readRDS("Inlabru_outputs/GRNE_model.rds")
 GT_model   <- readRDS("Inlabru_outputs/GT_model.rds")
 GTNE_model <- readRDS("Inlabru_outputs/GTNE_model.rds")
 GNE_model  <- readRDS("Inlabru_outputs/GNE_model.rds")
-N_model    <- readRDS("Inlabru_outputs/N_model.rds")
 
 ##############################################################################################
 # Original covariates
@@ -80,6 +78,8 @@ vals <- values(percent_guano_raster)
 filtered_vals <- vals[!is.na(vals)]
 mean(filtered_vals)
 
+summary(percent_guano_raster)
+
 # scale
 # (mean of 0 sd of 1)
 standardize <- function(r) {
@@ -88,18 +88,12 @@ standardize <- function(r) {
   (r - m) / s
 }
 
-# apply to continuous variables
-percent_guano_raster   <- standardize(percent_guano_raster)
+# apply to terrain variables only (need raw 2020 guano values for standardisation of 2019 guano)
 slope_raster     <- standardize(slope_raster)
 northness_raster    <- standardize(northness_raster)
 eastness_raster    <- standardize(eastness_raster)
 roughness_raster <- standardize(roughness_raster)
 TRI_raster       <- standardize(TRI_raster)
-
-summary(percent_guano_raster)
-
-# have to run this again
-percent_guano_raster[is.na(percent_guano_raster)] <- 0
 
 # check for misalignment
 covariate_plot <- c(percent_guano_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
@@ -107,10 +101,6 @@ plot(covariate_plot)
 
 # stack covariates
 cov_stack <- c(percent_guano_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
-
-# check for colinearity between covariates
-cov_values <- as.data.frame(cov_stack, na.rm = TRUE)
-cor(cov_values)
 
 ##############################################################################################
 # Get 2019 guano area
@@ -152,12 +142,9 @@ percent_guano_2019_raster  <- standardize_2020(percent_guano_raster, percent_gua
 
 summary(percent_guano_2019_raster)
 
-# have to run this again
-percent_guano_2019_raster[is.na(percent_guano_2019_raster)] <- 0
-
 # check for misalignment
-covariate_plot <- c(percent_guano_2019_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
-plot(covariate_plot)
+covariate_plot_2019 <- c(percent_guano_2019_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
+plot(covariate_plot_2019)
 
 # stack covariates
 cov_stack2 <- c(percent_guano_2019_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
@@ -169,6 +156,8 @@ cor(cov_values2)
 ##############################################################################################
 # Predict for 2019
 ##############################################################################################
+
+set.seed(28)
 
 # predict 2019 counts with 2020 fitted models
 
