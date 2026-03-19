@@ -6,17 +6,10 @@
 setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Inlabru/Inlabru_data")
 
 # load packages 
-library(sf)
-library(fmesher)
 library(ggplot2)
 library(INLA) # version 25.09.19
 library(inlabru) # for bru() version 2.13.0
-library(dplyr)
-library(purrr)
-library(tidyr)
 library(terra) # for rasters
-library(ggpubr)
-library(scoringRules) # for CRPS
 library(patchwork) # for partial prediction plots
 
 bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
@@ -36,7 +29,6 @@ GRNE_model <- readRDS("Inlabru_outputs/GRNE_model.rds")
 GT_model   <- readRDS("Inlabru_outputs/GT_model.rds")
 GTNE_model <- readRDS("Inlabru_outputs/GTNE_model.rds")
 GNE_model  <- readRDS("Inlabru_outputs/GNE_model.rds")
-N_model    <- readRDS("Inlabru_outputs/N_model.rds")
 
 ##############################################################################################
 # Covariates
@@ -128,36 +120,27 @@ raw_stats <- lapply(as.list(raw_stack), function(r) {
 })
 names(raw_stats) <- names(raw_stack)
 
-# make reference geometry point (mesh centroid, fix spatial field near zero)
-ref_point <- st_as_sf(
-  data.frame(x = mean(mesh_sub$loc[, 1]),
-             y = mean(mesh_sub$loc[, 2])),
-  coords = c("x", "y"),
-  crs = st_crs(counts_df)
-)
-
 # prediction sequence length
 n_seq <- 1000
 
 # make prediction df for focal covariate
-make_pred_df <- function(focal_var, raster_ranges, ref_point, n = n_seq) {
+make_pred_df <- function(focal_var, raster_ranges, n = n_seq) {
   
   seq_vals <- seq(raster_ranges[[focal_var]]$min,
                   raster_ranges[[focal_var]]$max,
                   length.out = n)
   
   df <- data.frame(
-    percentguano = 0,
-    slope        = 0,
-    northness    = 0,
-    eastness     = 0,
-    roughness    = 0,
-    TRI          = 0,
-    geometry     = st_geometry(ref_point)[rep(1, n)]
+    percentguano = rep(0, n),
+    slope        = rep(0, n),
+    northness    = rep(0, n),
+    eastness     = rep(0, n),
+    roughness    = rep(0, n),
+    TRI          = rep(0, n)
   )
   
   df[[focal_var]] <- seq_vals
-  st_as_sf(df)
+  df
 }
 
 # match names to covariate names
@@ -167,13 +150,15 @@ names(raster_ranges) <- c("percentguano", "slope", "northness", "eastness", "rou
 # Partial predictions
 ##############################################################################################
 
+set.seed(28)
+
 # compute partial predictions for each model
 # (dropping field from formula)
 
 # G model
 G_pred_guano <- predict(
   G_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula  = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano)),
   include  = character(0),
   n.samples = 1000
@@ -183,7 +168,7 @@ saveRDS(G_pred_guano, file = "Inlabru_outputs/G_pred_guano.rds")
 # GS model
 GS_pred_guano <- predict(
   GS_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + slope_eval(slope)),
   include   = character(0),
   n.samples = 1000
@@ -192,7 +177,7 @@ saveRDS(GS_pred_guano, file = "Inlabru_outputs/GS_pred_guano.rds")
 
 GS_pred_slope <- predict(
   GS_model,
-  newdata = make_pred_df("slope", raster_ranges, ref_point),
+  newdata = make_pred_df("slope", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + slope_eval(slope)),
   include   = character(0),
   n.samples = 1000
@@ -202,7 +187,7 @@ saveRDS(GS_pred_slope, file = "Inlabru_outputs/GS_pred_slope.rds")
 # GSNE model
 GSNE_pred_guano <- predict(
   GSNE_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + slope_eval(slope) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -211,7 +196,7 @@ saveRDS(GSNE_pred_guano, file = "Inlabru_outputs/GSNE_pred_guano.rds")
 
 GSNE_pred_slope <- predict(
   GSNE_model,
-  newdata = make_pred_df("slope", raster_ranges, ref_point),
+  newdata = make_pred_df("slope", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + slope_eval(slope) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -220,7 +205,7 @@ saveRDS(GSNE_pred_slope, file = "Inlabru_outputs/GSNE_pred_slope.rds")
 
 GSNE_pred_northness <- predict(
   GSNE_model,
-  newdata = make_pred_df("northness", raster_ranges, ref_point),
+  newdata = make_pred_df("northness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + slope_eval(slope) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -229,7 +214,7 @@ saveRDS(GSNE_pred_northness, file = "Inlabru_outputs/GSNE_pred_northness.rds")
 
 GSNE_pred_eastness <- predict(
   GSNE_model,
-  newdata = make_pred_df("eastness", raster_ranges, ref_point),
+  newdata = make_pred_df("eastness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + slope_eval(slope) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -239,7 +224,7 @@ saveRDS(GSNE_pred_eastness, file = "Inlabru_outputs/GSNE_pred_eastness.rds")
 # GR model
 GR_pred_guano <- predict(
   GR_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + roughness_eval(roughness)),
   include   = character(0),
   n.samples = 1000
@@ -248,7 +233,7 @@ saveRDS(GR_pred_guano, file = "Inlabru_outputs/GR_pred_guano.rds")
 
 GR_pred_roughness <- predict(
   GR_model,
-  newdata = make_pred_df("roughness", raster_ranges, ref_point),
+  newdata = make_pred_df("roughness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + roughness_eval(roughness)),
   include   = character(0),
   n.samples = 1000
@@ -258,7 +243,7 @@ saveRDS(GR_pred_roughness, file = "Inlabru_outputs/GR_pred_roughness.rds")
 # GRNE model
 GRNE_pred_guano <- predict(
   GRNE_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + roughness_eval(roughness) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -267,7 +252,7 @@ saveRDS(GRNE_pred_guano, file = "Inlabru_outputs/GRNE_pred_guano.rds")
 
 GRNE_pred_roughness <- predict(
   GRNE_model,
-  newdata = make_pred_df("roughness", raster_ranges, ref_point),
+  newdata = make_pred_df("roughness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + roughness_eval(roughness) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -276,7 +261,7 @@ saveRDS(GRNE_pred_roughness, file = "Inlabru_outputs/GRNE_pred_roughness.rds")
 
 GRNE_pred_northness <- predict(
   GRNE_model,
-  newdata = make_pred_df("northness", raster_ranges, ref_point),
+  newdata = make_pred_df("northness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + roughness_eval(roughness) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -285,7 +270,7 @@ saveRDS(GRNE_pred_northness, file = "Inlabru_outputs/GRNE_pred_northness.rds")
 
 GRNE_pred_eastness <- predict(
   GRNE_model,
-  newdata = make_pred_df("eastness", raster_ranges, ref_point),
+  newdata = make_pred_df("eastness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + roughness_eval(roughness) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -295,7 +280,7 @@ saveRDS(GRNE_pred_eastness, file = "Inlabru_outputs/GRNE_pred_eastness.rds")
 # GT model
 GT_pred_guano <- predict(
   GT_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + TRI_eval(TRI)),
   include   = character(0),
   n.samples = 1000
@@ -304,7 +289,7 @@ saveRDS(GT_pred_guano, file = "Inlabru_outputs/GT_pred_guano.rds")
 
 GT_pred_TRI <- predict(
   GT_model,
-  newdata = make_pred_df("TRI", raster_ranges, ref_point),
+  newdata = make_pred_df("TRI", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + TRI_eval(TRI)),
   include   = character(0),
   n.samples = 1000
@@ -314,7 +299,7 @@ saveRDS(GT_pred_TRI, file = "Inlabru_outputs/GT_pred_TRI.rds")
 # GTNE model
 GTNE_pred_guano <- predict(
   GTNE_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + TRI_eval(TRI) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -323,7 +308,7 @@ saveRDS(GTNE_pred_guano, file = "Inlabru_outputs/GTNE_pred_guano.rds")
 
 GTNE_pred_TRI <- predict(
   GTNE_model,
-  newdata = make_pred_df("TRI", raster_ranges, ref_point),
+  newdata = make_pred_df("TRI", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + TRI_eval(TRI) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -332,7 +317,7 @@ saveRDS(GTNE_pred_TRI, file = "Inlabru_outputs/GTNE_pred_TRI.rds")
 
 GTNE_pred_northness <- predict(
   GTNE_model,
-  newdata = make_pred_df("northness", raster_ranges, ref_point),
+  newdata = make_pred_df("northness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + TRI_eval(TRI) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -341,7 +326,7 @@ saveRDS(GTNE_pred_northness, file = "Inlabru_outputs/GTNE_pred_northness.rds")
 
 GTNE_pred_eastness <- predict(
   GTNE_model,
-  newdata = make_pred_df("eastness", raster_ranges, ref_point),
+  newdata = make_pred_df("eastness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + TRI_eval(TRI) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -351,7 +336,7 @@ saveRDS(GTNE_pred_eastness, file = "Inlabru_outputs/GTNE_pred_eastness.rds")
 # GNE model
 GNE_pred_guano <- predict(
   GNE_model,
-  newdata = make_pred_df("percentguano", raster_ranges, ref_point),
+  newdata = make_pred_df("percentguano", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -360,7 +345,7 @@ saveRDS(GNE_pred_guano, file = "Inlabru_outputs/GNE_pred_guano.rds")
 
 GNE_pred_northness <- predict(
   GNE_model,
-  newdata = make_pred_df("northness", raster_ranges, ref_point),
+  newdata = make_pred_df("northness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
@@ -369,7 +354,7 @@ saveRDS(GNE_pred_northness, file = "Inlabru_outputs/GNE_pred_northness.rds")
 
 GNE_pred_eastness <- predict(
   GNE_model,
-  newdata = make_pred_df("eastness", raster_ranges, ref_point),
+  newdata = make_pred_df("eastness", raster_ranges),
   formula   = ~ exp(Intercept_eval(rep(1, nrow(.data.))) + percentguano_eval(percentguano) + northness_eval(northness) + eastness_eval(eastness)),
   include   = character(0),
   n.samples = 1000
