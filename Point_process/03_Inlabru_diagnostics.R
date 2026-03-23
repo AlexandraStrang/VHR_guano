@@ -217,11 +217,6 @@ abundance_df <- data.frame(
 # save abundance df
 write.csv(abundance_df, file = "Inlabru_outputs/Abundance_predictions.csv", row.names = FALSE)
 
-results_df <- merge(results_df, abundance_df, by = "Model", all.x = TRUE)
-
-# save model outputs
-write.csv(results_df, file = "Inlabru_outputs/Candidate_results.csv", row.names = FALSE)
-
 # abundance predictions plot
 a_pred_df <- abundance_df %>%
   filter(Model != "N") %>%
@@ -633,5 +628,11 @@ mlik_plot <- ggplot(mlik_df, aes(x = Model, y = MLik)) +
   theme_minimal()
 
 mlik_plot
+
+
+results_df <- merge(results_df, abundance_df, by = "Model", all.x = TRUE)
+
+# save model outputs
+write.csv(results_df, file = "Inlabru_outputs/Candidate_results.csv", row.names = FALSE)
 
 # model selection ..........................................
