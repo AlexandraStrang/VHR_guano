@@ -68,6 +68,9 @@ View(Dataset.1.4)
 # Change colony_name to colony for figures
 Dataset.1.4$Colony <- Dataset.1.4$Colony_name
 
+# Include guano area on log scale
+Dataset.1.4$Log_GA <- log(Dataset.1.4$GA)
+
 ##########################################################################
 # Visualise within season data by colony across time
 ##########################################################################
@@ -135,10 +138,6 @@ All_3_plot <- plot(ggarrange(ADAR_plot,
                               nrow = 3,
                               labels = c("Cape Adare", "Cape Crozier", "Cape Hallett"),
                               label.x = 0.1))
-
-
-# Try guano area on log scale
-Dataset.1.4$Log_GA <- log(Dataset.1.4$GA)
 
 # View
 View(Dataset.1.4)
@@ -293,7 +292,7 @@ corrplot(cor.matrix, method = "number", type = "lower", tl.cex = 1)
 
 # include only max of two covariates
 # excluding collinear variables
-# fit by ML to compare candidate models
+# fit by ML to compare candidate models?
 # use variance structure by colony to account for differences 
 
 # single fixed-effects
@@ -341,6 +340,7 @@ log_reduced4_lmm <- lme(
 )
 M4_AIC <- AIC(log_reduced4_lmm)
 M4_AICc <- AICc(log_reduced4_lmm)
+M4_BIC <- BIC(log_reduced4_lmm)
 
 # Day_d1 model
 log_reduced5_lmm <- lme(
@@ -352,6 +352,7 @@ log_reduced5_lmm <- lme(
 )
 M5_AIC <- AIC(log_reduced5_lmm)
 M5_AICc <- AICc(log_reduced5_lmm)
+M5_BIC <- BIC(log_reduced5_lmm)
 # same as sun el model
 
 # 9 candidate models with two fixed effects
@@ -410,8 +411,10 @@ log_reduced10_lmm <- lme(
 )
 M10_AIC <- AIC(log_reduced10_lmm)
 M10_AICc <- AICc(log_reduced10_lmm)
+M10_BIC <- BIC(log_reduced10_lmm)
 
 cor(Dataset.1.4$MEANSUNEL, Dataset.1.4$MEANSUNAZ)
+# -0.3387859
 
 # gsd and sun az model
 log_reduced11_lmm <- lme(
@@ -457,26 +460,34 @@ log_reduced14_lmm <- lme(
 M14_AIC <- AIC(log_reduced14_lmm)
 M14_AICc <- AICc(log_reduced14_lmm)
 
-# Day_D1 and sun el in same model? (VIF check)
-
 # null model
 null_model <- lme(
   fixed = Log_GA ~ 1,
-  random = ~ 1 | Colony_code,
+  #random = ~ 1 | Colony_code,
   data = Dataset.1.4,
   weights = varIdent(form = ~ 1 | Colony_code),
   method  = "ML",
 )
 null_AIC <- AIC(null_model)
 null_AICc <- AICc(null_model)
+null_BIC <- BIC(null_model)
 
-# removed days since December 1st?
-
-# model selection using mumin (without null)
-model_list <- list(log_reduced1_lmm, log_reduced2_lmm, log_reduced3_lmm, log_reduced4_lmm, 
-                   log_reduced5_lmm, log_reduced6_lmm, log_reduced7_lmm, log_reduced8_lmm,
-                   log_reduced9_lmm, log_reduced10_lmm, log_reduced11_lmm, log_reduced12_lmm,
-                   log_reduced13_lmm, log_reduced14_lmm)
+# model selection using mumin (with null)
+model_list <- list(log_reduced1_lmm, 
+                   log_reduced2_lmm, 
+                   log_reduced3_lmm, 
+                   #log_reduced4_lmm, 
+                   log_reduced5_lmm, 
+                   log_reduced6_lmm, 
+                   #log_reduced7_lmm, 
+                   log_reduced8_lmm,
+                   #log_reduced9_lmm, 
+                   #log_reduced10_lmm, 
+                   log_reduced11_lmm, 
+                   log_reduced12_lmm,
+                   log_reduced13_lmm, 
+                   log_reduced14_lmm, 
+                   null_model)
 model_selection <- model.sel(model_list) # default rank AICc
 model_selection
 
@@ -517,11 +528,11 @@ print(AICc_table)
 # variation in guano area is more influential then a change in size
 
 # check residuals of top model containing a fixed effect
-qqnorm(resid(log_reduced4_lmm))  # Q-Q plot for residuals
-qqline(resid(log_reduced4_lmm))  # reference line
+qqnorm(resid(log_reduced10_lmm))  # Q-Q plot for residuals
+qqline(resid(log_reduced10_lmm))  # reference line
 
-Dataset.1.4$fittedbest <- fitted(log_reduced4_lmm)
-Dataset.1.4$residbest <- resid(log_reduced4_lmm)
+Dataset.1.4$fittedbest <- fitted(log_reduced10_lmm)
+Dataset.1.4$residbest <- resid(log_reduced10_lmm, type = "pearson")
 
 Best_resids <- ggplot(Dataset.1.4, aes(x=fittedbest, y=residbest, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
@@ -537,7 +548,7 @@ Best_resids <- ggplot(Dataset.1.4, aes(x=fittedbest, y=residbest, colour = Colon
   scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
 
 Best_resids
-# still spreading
+# still spreading (don't look great)
 
 # null resids
 qqnorm(resid(null_model))  # Q-Q plot for residuals
@@ -612,12 +623,13 @@ Feb_model <- lme(
 )
 Feb_AIC <- AIC(Feb_model)
 Feb_AICc <- AICc(Feb_model)
+Feb_BIC <- BIC(Feb_model)
 
 anova(null_model, Feb_model)
 # Feb effect model is better
 
 # AICc
-x <- c(Feb_AICc, null_AICc, M4_AICc, M1_AICc, M2_AICc)
+x <- c(Feb_AICc, null_AICc, M4_AICc, M5_AICc, M10_AICc)
 Weights(x)
 
 # compute delta AICc
@@ -627,7 +639,8 @@ delta <- x - min(x)
 rel.lik <- exp(-0.5 * delta)
 rel.lik
 
-model_names <- c("February effect", "Null (random intercpets) model", "Sun elevation angle", "Off-nadir angle", "Ground resolution")
+model_names <- c("February effect", "Null (random intercpets) model", 
+                 "Sun elevation angle", "Days since Dec 1st", "sun elevation angle + Sun azimuth")
 
 AICc_table <- data.frame(
   Model = model_names,
@@ -639,6 +652,24 @@ AICc_table <- data.frame(
 
 AICc_table[, 2:5] <- round(AICc_table[, 2:5], 2)
 print(AICc_table)
+
+# make BIC table for competitive models
+# for candidate models within delta 2 AICc
+y <- c(Feb_BIC, null_BIC, M4_BIC, M5_BIC, M10_BIC)
+
+# compute delta BIC
+BIC_delta <- y - min(y)
+
+model_names <- c("February effect", "Null (random intercpets) model", 
+                 "Sun elevation angle", "Days since Dec 1st", "sun elevation angle + Sun azimuth")
+
+BIC_table <- data.frame(
+  Model = model_names,
+  BIC = y,
+  Delta_BIC = BIC_delta
+)
+BIC_table[, 2:3] <- round(BIC_table[, 2:3], 3)
+print(BIC_table)
 
 # Feb model resids
 qqnorm(resid(Feb_model))  # Q-Q plot for residuals
@@ -662,6 +693,8 @@ Feb_resids <- ggplot(Dataset.1.4, aes(x=fittedfeb, y=residfeb, colour = Colony_c
   scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
 
 Feb_resids
+# resids show Adare spreads most as predicted by model structure
+# driven by colony-specific variance structure
 
 # acf on Feb model
 AR1_Feb <- lme(
@@ -682,17 +715,17 @@ anova(Feb_model, AR1_Feb)
 
 # build in variance structure to account for resdidual variance differing by colony
 
-# heteroscedastic model
+# non heteroscedastic model
 Feb_model2 <- lme(
   fixed = Log_GA ~ Feb_effect,
   random = ~ 1 | Colony_code,
-  weights = varIdent(form = ~ 1 | Colony_code),
-  data = Dataset.1.4
+  data = Dataset.1.4,
+  method  = "ML",
 )
 summary(Feb_model2)
 
 # compare homoscedastic vs heteroscedastic model
-anova(Feb_model, Feb_model2)
+anova(Feb_model2, Feb_model)
 
 # Variance structure Feb model resids
 qqnorm(resid(Feb_model2))  # Q-Q plot for residuals
@@ -716,7 +749,7 @@ Feb_resids2 <- ggplot(Dataset.1.4, aes(x=fittedfeb2, y=residfeb2, colour = Colon
   scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
 
 Feb_resids2
-# resids show Adare spreads most as predicted by model structure
+# residual pattern even
 
 Dataset.1.4$fitted_feb2   <- fitted(Feb_model2)
 Dataset.1.4$norm_resid    <- resid(Feb_model2, type = "normalized")
