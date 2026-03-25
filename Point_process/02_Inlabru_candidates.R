@@ -90,9 +90,6 @@ TRI_raster       <- standardize(TRI_raster)
 
 summary(percent_guano_raster)
 
-# have to run this again
-percent_guano_raster[is.na(percent_guano_raster)] <- 0
-
 # check for misalignment
 covariate_plot <- c(percent_guano_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
 plot(covariate_plot)
