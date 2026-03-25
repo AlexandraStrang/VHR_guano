@@ -25,7 +25,7 @@ bru_options_set(control.compute = list(cpo = TRUE, dic = TRUE, waic = TRUE))
 ##############################################################################################
 
 # 2020 count dataframe created in inlabru candidates
-counts_df     <- readRDS("Inlabru_outputs/counts_df.rds")
+counts_df <- readRDS("Inlabru_outputs/counts_df.rds")
 
 # coastline boundary
 buff_boundary <- readRDS("Inlabru_outputs/buff_boundary.rds")
@@ -99,7 +99,7 @@ TRI_raster       <- standardize(TRI_raster)
 covariate_plot <- c(percent_guano_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
 plot(covariate_plot)
 
-# stack covariates
+# stack covariates (guano not scaled like the others)
 cov_stack <- c(percent_guano_raster, slope_raster, northness_raster, eastness_raster, roughness_raster, TRI_raster)
 
 ##############################################################################################
@@ -153,6 +153,8 @@ cov_stack2 <- c(percent_guano_2019_raster, slope_raster, northness_raster, eastn
 cov_values2 <- as.data.frame(cov_stack2, na.rm = TRUE)
 cor(cov_values2)
 
+# AGGREGATION OF COV_STACK TO 10 X 10 RES BELOW
+
 ##############################################################################################
 # Predict for 2019
 ##############################################################################################
@@ -165,6 +167,9 @@ set.seed(28)
 
 # swap for 2019 guano (2020 standardised)
 cov_stack$CrozierGuano_2m <- percent_guano_2019_raster
+
+# aggregate covariates to match count raster
+cov_stack <- terra::aggregate(cov_stack, fact = 5, fun = mean)
 
 geom_data <- st_as_sf(counts_df) %>% select(geometry, area)
 
@@ -340,7 +345,7 @@ abundance_plot_2019 <- ggplot(a_pred_df_2019, aes(x = Model, y = predicted_abund
     x = "Model",
     y = "Predicted count (BP)"
   ) +
-  scale_y_continuous(limits = c(245000, 350000)) +
+  scale_y_continuous(limits = c(245000, 270000)) +
   theme_minimal() +
   theme(legend.position = "right") 
 
@@ -363,7 +368,7 @@ difference_plot_2019 <- ggplot(diff_df_2019, aes(x = Model, y = difference)) +
   labs(
     x = "Model",
     y = "Predicted - observed count (BP)") +
-  scale_y_continuous(limits = c(80000, 85000)) +
+  scale_y_continuous(limits = c(15000, 25000)) +
   theme_minimal()
 
 difference_plot_2019
@@ -387,7 +392,6 @@ st_crs(sf_Crozier_2019)
 # note cov_stack contains 2019 guano
 count_raster_2019 <- 
   terra::rasterize(vect(sf_Crozier_2019), cov_stack, fun = sum, background = 0) %>%
-  terra::aggregate(fact = 5, fun = sum) %>%
   mask(vect(sf::st_geometry(buff_boundary)))
 
 # counts of nests
