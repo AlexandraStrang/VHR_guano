@@ -40,6 +40,9 @@ st_crs(sf_Crozier_boundary)
 
 # add 100 m buffer around coastline boundary
 buff_boundary <- st_buffer(sf_Crozier_boundary, dist = 100)
+# get domain area
+boundary_area <- st_area(buff_boundary)
+print(boundary_area) # 4.17 km2
 
 # mesh parameters
 Crozier_max.edge <- 90
