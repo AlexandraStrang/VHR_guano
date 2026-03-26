@@ -698,6 +698,45 @@ null_model <- lme(
 )
 summary(null_model)
 
+# Day_D1 and off-nadir model
+log_reduced14_lmm <- lme(
+  fixed = Log_GA ~ Day_D1 + MEANOFFNADIRVIEWANGLE,
+  random = ~ 1 | Colony_code,
+  data = Dataset.1.4
+)
+summary(log_reduced14_lmm)
+
+# Day_d1 model
+log_reduced5_lmm <- lme(
+  fixed = Log_GA ~ Day_D1,
+  random = ~ 1 | Colony_code,
+  data = Dataset.1.4
+)
+summary(log_reduced5_lmm)
+
+# sun el model
+log_reduced4_lmm <- lme(
+  fixed = Log_GA ~ MEANSUNEL,
+  random = ~ 1 | Colony_code,
+  data = Dataset.1.4
+)
+summary(log_reduced4_lmm)
+
+# sun el and off-nadir model
+log_reduced7_lmm <- lme(
+  fixed = Log_GA ~ MEANSUNEL + MEANOFFNADIRVIEWANGLE,
+  random = ~ 1 | Colony_code,
+  data = Dataset.1.4
+)
+summary(log_reduced7_lmm)
+
+# off-nadir model
+log_reduced1_lmm <- lme(
+  fixed = Log_GA ~ MEANOFFNADIRVIEWANGLE,
+  random = ~ 1 | Colony_code,
+  data = Dataset.1.4
+)
+summary(log_reduced1_lmm)
 
 ##########################################################################
 # GA and BP relationship (model created in Strang MSc thesis - Strang et al. 2025 RSEC)
