@@ -632,6 +632,10 @@ mlik_plot
 
 results_df <- merge(results_df, abundance_df, by = "Model", all.x = TRUE)
 
+# Delta DIC scores
+deltaIC(G_model, GS_model, GSNE_model, GR_model, GRNE_model, GT_model,
+        GTNE_model, GNE_model, N_model)
+
 # save model outputs
 write.csv(results_df, file = "Inlabru_outputs/Candidate_results.csv", row.names = FALSE)
 
