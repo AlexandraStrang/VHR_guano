@@ -9,7 +9,6 @@ library(dplyr)
 library(corrplot)
 library(MuMIn) # for AICc scores
 library(nlme) # Use REML for low sample sizes
-library(performance) # can't use vif for lmm
 
 setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Data sheets")
 
@@ -677,7 +676,6 @@ acf(resid(AR1_Feb))
 anova(Feb_model, AR1_Feb)
 # model without autoregressive structure is better 
 # no evidence that adding the AR(1) structure improves model fit
-
 
 # Top models
 # for model coefficients table use REML method
