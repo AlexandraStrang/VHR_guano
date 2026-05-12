@@ -251,6 +251,7 @@ ggsave("Chap1_outputs/Seasonal_GA_boxplot.png", Box_plot,
        dpi = 600)
 
 # Calculate means and standard deviations for each colony
+# calculate the coefficient of variation (CV) to see if variance is larger than expected given the colony size
 
 # Create table
 summary_table <- Dataset.1.4 %>%
@@ -258,7 +259,8 @@ summary_table <- Dataset.1.4 %>%
   summarise(n = n(),
             mean_GA = mean(GA),
             median_GA = median(GA),
-            sd = sd(GA))
+            sd = sd(GA),
+            CV = (sd(GA) / mean(GA)))
 
 # Create a table plot
 table_plot <- ggtexttable(summary_table, rows = NULL)
@@ -266,7 +268,7 @@ table_plot <- ggtexttable(summary_table, rows = NULL)
 # Show table in Plots window
 plot(table_plot)
 
-# The larger the colony, the larger the variation
+# The larger the colony, the larger the variation (expected), but not more variation than expected
 
 ##########################################################################
 # Test for multi-colinearity between covariates
@@ -285,12 +287,12 @@ corrplot(cor.matrix, method = "number", type = "lower", tl.cex = 1)
 # sun elevation and days since December first correlated = expected
 # different hypotheses - but do not include in same models
 
+# only using max 1 covariate in each candidate model
+
 ##########################################################################
 # Build candidate models with satellite-related factors
 ##########################################################################
 
-# include only max of two covariates
-# excluding collinear variables
 # fit by ML to compare candidate models
 
 # single fixed-effects
@@ -348,102 +350,6 @@ M5_AICc <- AICc(log_reduced5_lmm)
 M5_BIC <- BIC(log_reduced5_lmm)
 # same as sun el model
 
-# 9 candidate models with two fixed effects
-
-# gsd and off-nadir model
-log_reduced6_lmm <- lme(
-  fixed = Log_GA ~ MEANCOLLECTEDGSD + MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M6_AIC <- AIC(log_reduced6_lmm)
-M6_AICc <- AICc(log_reduced6_lmm)
-
-# sun el and off-nadir model
-log_reduced7_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNEL + MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M7_AIC <- AIC(log_reduced7_lmm)
-M7_AICc <- AICc(log_reduced7_lmm)
-
-# sun az and off-nadir model
-log_reduced8_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNAZ + MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M8_AIC <- AIC(log_reduced8_lmm)
-M8_AICc <- AICc(log_reduced8_lmm)
-
-# sun el and gsd model
-log_reduced9_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNEL + MEANCOLLECTEDGSD,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M9_AIC <- AIC(log_reduced9_lmm)
-M9_AICc <- AICc(log_reduced9_lmm)
-
-# sun el and sun az model
-log_reduced10_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNEL + MEANSUNAZ,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M10_AIC <- AIC(log_reduced10_lmm)
-M10_AICc <- AICc(log_reduced10_lmm)
-M10_BIC <- BIC(log_reduced10_lmm)
-
-cor(Dataset.1.4$MEANSUNEL, Dataset.1.4$MEANSUNAZ)
-# -0.3387859
-
-# gsd and sun az model
-log_reduced11_lmm <- lme(
-  fixed = Log_GA ~ MEANCOLLECTEDGSD + MEANSUNAZ,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M11_AIC <- AIC(log_reduced11_lmm)
-M11_AICc <- AICc(log_reduced11_lmm)
-
-# Day_D1 and gsd model
-log_reduced12_lmm <- lme(
-  fixed = Log_GA ~ Day_D1 + MEANCOLLECTEDGSD,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M12_AIC <- AIC(log_reduced12_lmm)
-M12_AICc <- AICc(log_reduced12_lmm)
-
-# Day_D1 and sun az model
-log_reduced13_lmm <- lme(
-  fixed = Log_GA ~ Day_D1 + MEANSUNAZ,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M13_AIC <- AIC(log_reduced13_lmm)
-M13_AICc <- AICc(log_reduced13_lmm)
-
-# Day_D1 and off-nadir model
-log_reduced14_lmm <- lme(
-  fixed = Log_GA ~ Day_D1 + MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M14_AIC <- AIC(log_reduced14_lmm)
-M14_AICc <- AICc(log_reduced14_lmm)
-
 # null model
 null_model <- lme(
   fixed = Log_GA ~ 1,
@@ -461,15 +367,6 @@ model_list <- list(log_reduced1_lmm,
                    log_reduced3_lmm, 
                    log_reduced4_lmm, 
                    log_reduced5_lmm, 
-                   log_reduced6_lmm, 
-                   log_reduced7_lmm, 
-                   log_reduced8_lmm,
-                   log_reduced9_lmm, 
-                   log_reduced10_lmm, 
-                   log_reduced11_lmm, 
-                   log_reduced12_lmm,
-                   log_reduced13_lmm, 
-                   log_reduced14_lmm, 
                    null_model)
 model_selection <- model.sel(model_list) # default rank AICc
 model_selection
@@ -483,7 +380,7 @@ summary(avg_model)
 # calculate delta AICc scores and weights
 
 # AICc for candidate models within delta 2 AIC
-x <- c(null_AICc, M1_AICc, M4_AICc, M5_AICc, M7_AICc, M14_AICc)
+x <- c(null_AICc, M1_AICc, M4_AICc, M5_AICc)
 
 # compute delta AICc
 delta <- x - min(x)
@@ -492,7 +389,7 @@ delta <- x - min(x)
 rel.lik <- exp(-0.5 * delta)
 rel.lik
 
-model_names <- c("Null (random intercpets) model", "Off-nadir angle", "Sun elevation angle", "Days since Dec 1st", "Off-nadir angle + Sun elevation angle", "Off-nadir angle + Days since Dec 1st")
+model_names <- c("Null (random intercpets) model", "Off-nadir angle", "Sun elevation angle", "Days since Dec 1st")
 
 AICc_table <- data.frame(
   Model = model_names,
@@ -604,8 +501,7 @@ rel.lik <- exp(-0.5 * delta)
 rel.lik
 
 model_names <- c("February effect", "Null (random intercpets) model", 
-                 "Off-nadir angle", "Sun elevation angle", "Days since Dec 1st", 
-                 "Off-nadir angle + Sun elevation angle", "Off-nadir angle + Days since Dec 1st")
+                 "Off-nadir angle", "Sun elevation angle", "Days since Dec 1st")
 
 AICc_table <- data.frame(
   Model = model_names,
@@ -696,14 +592,6 @@ null_model <- lme(
 )
 summary(null_model)
 
-# Day_D1 and off-nadir model
-log_reduced14_lmm <- lme(
-  fixed = Log_GA ~ Day_D1 + MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(log_reduced14_lmm)
-
 # Day_d1 model
 log_reduced5_lmm <- lme(
   fixed = Log_GA ~ Day_D1,
@@ -719,14 +607,6 @@ log_reduced4_lmm <- lme(
   data = Dataset.1.4
 )
 summary(log_reduced4_lmm)
-
-# sun el and off-nadir model
-log_reduced7_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNEL + MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(log_reduced7_lmm)
 
 # off-nadir model
 log_reduced1_lmm <- lme(
