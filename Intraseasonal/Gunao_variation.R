@@ -371,12 +371,6 @@ model_list <- list(log_reduced1_lmm,
 model_selection <- model.sel(model_list) # default rank AICc
 model_selection
 
-# model averaging
-avg_model <- model.avg(model_selection, subset = delta < 2) # models with 2 delta AICc
-summary(avg_model)
-# full average for conservative estimates - should variable be in model at all
-# conditional average for effect size - if it is present in the model
-
 # calculate delta AICc scores and weights
 
 # AICc for candidate models within delta 2 AIC
@@ -402,15 +396,13 @@ AICc_table <- data.frame(
 AICc_table[, 2:3] <- round(AICc_table[, 2:3], 3)
 print(AICc_table)
 
-# variation in guano area is more influential then a change in size
-
 # check residuals of top model containing a fixed effect
-qqnorm(resid(log_reduced14_lmm))  # Q-Q plot for residuals
-qqline(resid(log_reduced14_lmm))  # reference line
+qqnorm(resid(log_reduced5_lmm))  # Q-Q plot for residuals
+qqline(resid(log_reduced5_lmm))  # reference line
 # slight curvature but expected at extremes
 
-Dataset.1.4$fittedbest <- fitted(log_reduced14_lmm)
-Dataset.1.4$residbest <- resid(log_reduced14_lmm)
+Dataset.1.4$fittedbest <- fitted(log_reduced5_lmm)
+Dataset.1.4$residbest <- resid(log_reduced5_lmm)
 
 Best_resids <- ggplot(Dataset.1.4, aes(x=fittedbest, y=residbest, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
@@ -426,7 +418,7 @@ Best_resids <- ggplot(Dataset.1.4, aes(x=fittedbest, y=residbest, colour = Colon
   scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
 
 Best_resids
-# Even spread
+# Larger spread with larger colony
 
 # null resids
 qqnorm(resid(null_model))  # Q-Q plot for residuals
@@ -449,7 +441,7 @@ null_resids <- ggplot(Dataset.1.4, aes(x=fittednull, y=residnull, colour = Colon
   scale_y_continuous(limits = c(-0.4,0.4), breaks = seq(-0.4, 0.4, by=0.2))
 
 null_resids
-# resids of top model look better (spreading in null model)
+# resids of top model look better (larger spread in null model)
 
 ##########################################################################
 # ANOVA test for February effect
@@ -489,7 +481,7 @@ anova(null_model, Feb_model)
 # Feb effect model is better
 
 # AICc
-x <- c(Feb_AICc, null_AICc, M1_AICc, M4_AICc, M5_AICc, M7_AICc, M14_AICc)
+x <- c(Feb_AICc, null_AICc, M1_AICc, M4_AICc, M5_AICc)
 
 Weights(x)
 
@@ -513,23 +505,6 @@ AICc_table <- data.frame(
 
 AICc_table[, 2:5] <- round(AICc_table[, 2:5], 2)
 print(AICc_table)
-
-# make BIC table for competitive models
-# for candidate models within delta 2 AICc
-y <- c(Feb_BIC, null_BIC)
-
-# compute delta BIC
-BIC_delta <- y - min(y)
-
-model_names <- c("February effect", "Null (random intercpets) model")
-
-BIC_table <- data.frame(
-  Model = model_names,
-  BIC = y,
-  Delta_BIC = BIC_delta
-)
-BIC_table[, 2:3] <- round(BIC_table[, 2:3], 3)
-print(BIC_table)
 
 # Feb model resids
 qqnorm(resid(Feb_model))  # Q-Q plot for residuals
@@ -584,6 +559,10 @@ Feb_model <- lme(
 )
 summary(Feb_model)
 
+# R2 of the top model
+r.squaredGLMM(Feb_model)
+# random effects explaining most
+
 # null model
 null_model <- lme(
   fixed = Log_GA ~ 1,
@@ -620,11 +599,12 @@ summary(log_reduced1_lmm)
 # GA and BP relationship (model created in Strang MSc thesis - Strang et al. 2025 RSEC)
 ##########################################################################
 
-# update to include all 15 colonies
+# update to include more colonies
 
 # Extract only interseasonal data and needed variables 
 Dataset.2.0 <- Dataset.1.0[,c("Colony_name","GA","BP","Analysis2","Date")]
 View(Dataset.2.0)
+# check dates are 2009-2023
 
 # Keep only interseaonal data
 # interseasonal analysis for within season images is median estimate date
@@ -717,6 +697,9 @@ Feb_mixed <- lme(
 summary(Feb_mixed)
 anova(Feb_mixed)
 # Feb effect not significant
+
+# R2 of the extended feb model
+r.squaredGLMM(Feb_mixed)
 
 # Make BP predictions from GA~BP model (model created in Strang MSc thesis)
 
