@@ -13,7 +13,7 @@ library(nlme) # Use REML for low sample sizes
 setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Data sheets")
 
 # Read in data
-Dataset.1.0 <- read.csv("Merged_masterdata.csv")
+Dataset.1.0 <- read.csv("Chap1_PB_data/PB_data_20260519.csv")
 
 # Colours for each colony
 colours <- c("darkblue","royalblue","skyblue")
@@ -138,16 +138,9 @@ All_3_plot <- plot(ggarrange(ADAR_plot,
                               labels = c("Cape Adare", "Cape Crozier", "Cape Hallett"),
                               label.x = 0.1))
 
-# View
-View(Dataset.1.4)
-
-# Subset the data by the three colonies
-ADARdf2 <- subset(Dataset.1.4, Dataset.1.4$Colony_code=="ADAR")
-CROZdf2 <- subset(Dataset.1.4, Dataset.1.4$Colony_code=="CROZ")
-HALLdf2 <- subset(Dataset.1.4, Dataset.1.4$Colony_code=="HALL")
 
 # Adare
-ADAR_plot2 <- ggplot(ADARdf2, aes(x = Day_D1, y = Log_GA)) +
+ADAR_plot2 <- ggplot(ADARdf, aes(x = Day_D1, y = Log_GA)) +
   geom_point(colour = "royalblue") +
   geom_line(colour = "royalblue") +
   xlab(element_blank()) +
@@ -163,7 +156,7 @@ ADAR_plot2 <- ggplot(ADARdf2, aes(x = Day_D1, y = Log_GA)) +
 ADAR_plot2
 
 # Crozier
-CROZ_plot2 <- ggplot(CROZdf2, aes(x = Day_D1, y = Log_GA)) +
+CROZ_plot2 <- ggplot(CROZdf, aes(x = Day_D1, y = Log_GA)) +
   geom_point(colour = "darkblue") +
   geom_line(colour = "darkblue") +
   xlab(element_blank()) +
@@ -179,7 +172,7 @@ CROZ_plot2 <- ggplot(CROZdf2, aes(x = Day_D1, y = Log_GA)) +
 CROZ_plot2
 
 # Hallett
-HALL_plot2 <- ggplot(HALLdf2, aes(x = Day_D1, y = Log_GA)) +
+HALL_plot2 <- ggplot(HALLdf, aes(x = Day_D1, y = Log_GA)) +
   geom_point(colour = "skyblue") +
   geom_line(colour = "skyblue") +
   xlab(element_blank()) +
@@ -268,7 +261,7 @@ table_plot <- ggtexttable(summary_table, rows = NULL)
 # Show table in Plots window
 plot(table_plot)
 
-# The larger the colony, the larger the variation (expected), but not more variation than expected
+# The larger the colony, the larger the variation
 
 ##########################################################################
 # Test for multi-colinearity between covariates
@@ -602,7 +595,7 @@ summary(log_reduced1_lmm)
 # update to include more colonies
 
 # Extract only interseasonal data and needed variables 
-Dataset.2.0 <- Dataset.1.0[,c("Colony_name","GA","BP","Analysis2","Date")]
+Dataset.2.0 <- Dataset.1.0[,c("Colony_name","Season","GA","BP","Analysis2","Date")]
 View(Dataset.2.0)
 # check dates are 2009-2023
 
@@ -670,7 +663,7 @@ Dataset.2.1$Day_D1 <- as.numeric(difftime(Dataset.2.1$r_date,
 # Days since December 1st: numerical but discrete without decimals 
 
 # Condense/ remove r date column
-Dataset.2.2 <- Dataset.2.1[,c("Colony_name","Log_GA","Log_BP","Date","GA", "Day_D1")]
+Dataset.2.2 <- Dataset.2.1[,c("Colony_name","Season","Log_GA","Log_BP","Date","GA", "Day_D1")]
 
 # subset data into estimates before and after 59 days since December 1st
 # 59 days since December 1st represents late January
@@ -707,13 +700,27 @@ r.squaredGLMM(Feb_mixed)
 # a is intercept
 # b is slope
 
-# extract model covariates 
-a <- coef(GA_BP)[1]  # intercept
-b <- coef(GA_BP)[2]  # slope
+# extract model covariates (from figure 4)
+#a <- coef(GA_BP)[1]  # intercept
+#b <- coef(GA_BP)[2]  # slope
 
 # invert by:
 # Log_BP = (Log_GA - a) / b
 # BP = exp((log(GA) - a) / b)
+
+# estimate breeding pair changes for GA changes within a season
+# coefficients from Feb_mixed model (under feb and average colony conditions)
+a <- -0.5047550 # intercept
+b <- 1.0567162 # slope
+
+GA <- c(
+  Adare   = 105711,
+  Crozier = 45623,
+  Hallett = 8325
+)
+
+BP <- exp((log(GA) - a) / b)
+BP
 
 # GA estimates across Dec - Feb for Adare, Crozier, and Hallett
 
@@ -722,7 +729,7 @@ Dataset.1.5 <- Dataset.1.4[,c("Colony_code","Season","Date","GA","Day_D1","Log_G
 View(Dataset.1.5)
 
 # predict log BP from intra-seasonal GA using updated GA ~ BP model
-Dataset.1.5$Log_BP_Pred <- NA  # initialise column
+Dataset.1.5$Log_BP_Pred <- NA
 Dataset.1.5$Log_BP_Pred <- (Dataset.1.5$Log_GA - a) / b
 
 # back-transform to get estimated BP
