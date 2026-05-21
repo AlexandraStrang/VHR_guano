@@ -556,3 +556,29 @@ pred_list <- list(G_pred,
 )
 
 saveRDS(pred_list, file = "Inlabru_outputs/pred_list.rds")
+
+#############################################################################################
+# Predictions for 2020 using old (MSc) method
+##############################################################################################
+
+# model: Log GA = a + b * Log BP * late-season
+# a is intercept
+# b is slope of BP
+# c is slope of Feb_effect
+
+# coefficients from ms eq 2 (under average colony conditions)
+a <- -0.5047550 # intercept
+b <- 1.0567162 # slope
+c <- -0.1027524 # Feb_effect coefficient for December estimates
+
+# invert by:
+# Log_BP = (Log_GA - a) / b
+# BP = exp((log(GA) - a) / b)
+
+# estimate breeding pair changes for GA changes within a season
+GA <- c(
+  Crozier_2020 = 361106
+)
+
+BP <- exp((log(GA) - a - c) / b)
+BP
