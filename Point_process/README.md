@@ -3,7 +3,7 @@
 The scripts for completing analysis to address question 2 in Strang et al. (in prep).
 
 Inlabru model analyses:
-- `01_Inlabru_mesh.R`: This script contains the R code used to construst the 2D triangulated mesh.
+- `01_Inlabru_mesh.R`: This script contains the R code used to construct the 2D triangulated mesh.
 - `02_Inlabru_candidates.R`: This script contains the R code to run 8 candidate models for 2020 data.
 - `03_Inlabru_diagnostics.R`: This script contains the R code to calculate the expected abundances, residuals, and diagnostic statistics for the 8 2020 candidate models.
 - `04_Inlabru_partial_predictions.R`: This script contains the R code to compute partial predictions and plots for each of the 8 2020 candidate models.
