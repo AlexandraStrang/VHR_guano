@@ -194,7 +194,7 @@ All_3_plot <- plot(ggarrange(ADAR_plot2,
                              ncol = 1,
                              nrow = 3,
                              labels = c("Cape Adare", "Cape Crozier", "Cape Hallett"),
-                             label.x = 0.1))
+                             label.x = 0.01))
 All_3_plot <- annotate_figure(All_3_plot, left = "Log guano area (m²)", bottom = "Days since December 1st")
 
 # Figure 2 of Chap 1
