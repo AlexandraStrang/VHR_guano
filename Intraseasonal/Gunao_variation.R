@@ -8,7 +8,6 @@ library(ggpubr)
 library(dplyr)
 library(corrplot)
 library(MuMIn) # for AICc scores
-library(nlme) # Use REML for low sample sizes
 
 setwd("C:/Users/ajs424/OneDrive - University of Canterbury/ANTA - PhD/Data/Data sheets")
 
@@ -217,7 +216,7 @@ All_together <- ggplot(Dataset.1.4, aes(x = Day_D1, y = Log_GA, group = Colony_c
   scale_color_manual(values = colours) +
   scale_x_continuous(limits = c(1,90), breaks = seq(1,90, by=10))
 
-All_together
+All_together # not included in manuscript
 
 # Differences between and within colonies (means and standard deviations)
 
@@ -238,7 +237,7 @@ Box_plot <- ggplot(Dataset.1.4, aes(x = Colony, y = Log_GA, fill = Colony)) +
 
 Box_plot
 
-# Figure 3 of Chap 1
+# not included in manuscript
 ggsave("Chap1_outputs/Seasonal_GA_boxplot.png", Box_plot,
        width = 8, height = 5, units = "in",
        dpi = 600)
@@ -288,86 +287,58 @@ corrplot(cor.matrix, method = "number", type = "lower", tl.cex = 1)
 
 # fit by ML to compare candidate models
 
-# single fixed-effects
+# single fixed-effects models
 
 # off-nadir model
-log_reduced1_lmm <- lme(
-  fixed = Log_GA ~ MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M1_AIC <- AIC(log_reduced1_lmm)
-M1_AICc <- AICc(log_reduced1_lmm)
+M1_lm <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$MEANOFFNADIRVIEWANGLE + Dataset.1.4$Colony_code)
+summary(M1_lm)
+M1_AIC <- AIC(M1_lm)
+M1_AICc <- AICc(M1_lm)
 
 # gsd model
-log_reduced2_lmm <- lme(
-  fixed = Log_GA ~ MEANCOLLECTEDGSD,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M2_AIC <- AIC(log_reduced2_lmm)
-M2_AICc <- AICc(log_reduced2_lmm)
+M2_lm <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$MEANCOLLECTEDGSD + Dataset.1.4$Colony_code)
+summary(M2_lm)
+M2_AIC <- AIC(M2_lm)
+M2_AICc <- AICc(M2_lm)
 
 # sun az model
-log_reduced3_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNAZ,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M3_AIC <- AIC(log_reduced3_lmm)
-M3_AICc <- AICc(log_reduced3_lmm)
+M3_lm <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$MEANSUNAZ + Dataset.1.4$Colony_code)
+summary(M3_lm)
+M3_AIC <- AIC(M3_lm)
+M3_AICc <- AICc(M3_lm)
 
 # sun el model
-log_reduced4_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNEL,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M4_AIC <- AIC(log_reduced4_lmm)
-M4_AICc <- AICc(log_reduced4_lmm)
-M4_BIC <- BIC(log_reduced4_lmm)
+M4_lm <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$MEANSUNEL + Dataset.1.4$Colony_code)
+summary(M4_lm)
+M4_AIC <- AIC(M4_lm)
+M4_AICc <- AICc(M4_lm)
 
 # Day_d1 model
-log_reduced5_lmm <- lme(
-  fixed = Log_GA ~ Day_D1,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-M5_AIC <- AIC(log_reduced5_lmm)
-M5_AICc <- AICc(log_reduced5_lmm)
-M5_BIC <- BIC(log_reduced5_lmm)
-# same as sun el model
+M5_lm <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$Day_D1 + Dataset.1.4$Colony_code)
+summary(M5_lm)
+M5_AIC <- AIC(M5_lm)
+M5_AICc <- AICc(M5_lm)
 
 # null model
-null_model <- lme(
-  fixed = Log_GA ~ 1,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-null_AIC <- AIC(null_model)
-null_AICc <- AICc(null_model)
-null_BIC <- BIC(null_model)
+null_lm <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$Colony_code)
+summary(null_lm)
+null_AIC <- AIC(null_lm)
+null_AICc <- AICc(null_lm)
 
 # model selection using mumin (with null)
-model_list <- list(log_reduced1_lmm, 
-                   log_reduced2_lmm, 
-                   log_reduced3_lmm, 
-                   log_reduced4_lmm, 
-                   log_reduced5_lmm, 
-                   null_model)
+model_list <- list(M1_lm, 
+                   M2_lm, 
+                   M3_lm, 
+                   M4_lm, 
+                   M5_lm, 
+                   null_lm)
 model_selection <- model.sel(model_list) # default rank AICc
 model_selection
 
 # calculate delta AICc scores and weights
 
 # AICc for candidate models within delta 2 AIC
-x <- c(null_AICc, M1_AICc, M4_AICc, M5_AICc)
+x <- c(null_AICc, M1_AICc, M2_AICc, M3_AICc, M4_AICc, M5_AICc)
 
 # compute delta AICc
 delta <- x - min(x)
@@ -376,7 +347,7 @@ delta <- x - min(x)
 rel.lik <- exp(-0.5 * delta)
 rel.lik
 
-model_names <- c("Null (random intercpets) model", "Off-nadir angle", "Sun elevation angle", "Days since Dec 1st")
+model_names <- c("Null (random intercpets) model", "Off-nadir angle", "GSD", "Sun Az", "Sun elevation angle", "Days since Dec 1st")
 
 AICc_table <- data.frame(
   Model = model_names,
@@ -390,12 +361,12 @@ AICc_table[, 2:3] <- round(AICc_table[, 2:3], 3)
 print(AICc_table)
 
 # check residuals of top model containing a fixed effect
-qqnorm(resid(log_reduced5_lmm))  # Q-Q plot for residuals
-qqline(resid(log_reduced5_lmm))  # reference line
+qqnorm(resid(M5_lm))  # Q-Q plot for residuals
+qqline(resid(M5_lm))  # reference line
 # slight curvature but expected at extremes
 
-Dataset.1.4$fittedbest <- fitted(log_reduced5_lmm)
-Dataset.1.4$residbest <- resid(log_reduced5_lmm)
+Dataset.1.4$fittedbest <- fitted(M5_lm)
+Dataset.1.4$residbest <- resid(M5_lm)
 
 Best_resids <- ggplot(Dataset.1.4, aes(x=fittedbest, y=residbest, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
@@ -414,11 +385,11 @@ Best_resids
 # Larger spread with larger colony
 
 # null resids
-qqnorm(resid(null_model))  # Q-Q plot for residuals
-qqline(resid(null_model))  # reference line
+qqnorm(resid(null_lm))  # Q-Q plot for residuals
+qqline(resid(null_lm))  # reference line
 
-Dataset.1.4$fittednull <- fitted(null_model)
-Dataset.1.4$residnull <- resid(null_model)
+Dataset.1.4$fittednull <- fitted(null_lm)
+Dataset.1.4$residnull <- resid(null_lm)
 
 null_resids <- ggplot(Dataset.1.4, aes(x=fittednull, y=residnull, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
@@ -437,12 +408,12 @@ null_resids
 # resids of top model look better (larger spread in null model)
 
 ##########################################################################
-# ANOVA test for February effect
+# Test for late-season effect
 ##########################################################################
 
 # subset within season data into estimates before and after 59 days since December 1st
 # 59 days since December 1st represents late January
-# the last two estimates for each colony are "Feb" and rest are "Pre_Feb"
+# the last two estimates for each colony are "Feb" (late-season) and rest are "Pre_Feb"
 
 # Subset the data into the first three points and the last two (Pre_Feb and Feb)
 Dataset.1.4$Feb_effect <- ifelse(Dataset.1.4$Day_D1 < 59, "Pre_Feb", "Feb")
@@ -457,20 +428,15 @@ summary(anova_model)
 # used log guano
 # significantly different between Pre_Feb and Feb, where the effect depends on colony
 
-# test February effect accounting for colony differences with random effect
+# test February effect accounting for colony differences
 
 # Feb effect model
-Feb_model <- lme(
-  fixed = Log_GA ~ Feb_effect,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4,
-  method  = "ML",
-)
-Feb_AIC <- AIC(Feb_model)
-Feb_AICc <- AICc(Feb_model)
-Feb_BIC <- BIC(Feb_model)
+Feb_lm <- lm(Dataset.1.4$Log_GA ~ Dataset.1.4$Feb_effect + Dataset.1.4$Colony_code)
+summary(Feb_lm)
+Feb_AIC <- AIC(Feb_lm)
+Feb_AICc <- AICc(Feb_lm)
 
-anova(null_model, Feb_model)
+anova(null_lm, Feb_lm)
 # Feb effect model is better
 
 # AICc
@@ -500,12 +466,12 @@ AICc_table[, 2:5] <- round(AICc_table[, 2:5], 2)
 print(AICc_table)
 
 # Feb model resids
-qqnorm(resid(Feb_model))  # Q-Q plot for residuals
-qqline(resid(Feb_model))  # reference line
+qqnorm(resid(Feb_lm))  # Q-Q plot for residuals
+qqline(resid(Feb_lm))  # reference line
 # Slight tails 
 
-Dataset.1.4$fittedfeb <- fitted(Feb_model)
-Dataset.1.4$residfeb <- resid(Feb_model)
+Dataset.1.4$fittedfeb <- fitted(Feb_lm)
+Dataset.1.4$residfeb <- resid(Feb_lm)
 
 Feb_resids <- ggplot(Dataset.1.4, aes(x=fittedfeb, y=residfeb, colour = Colony_code, fill = Colony_code, shape = Colony_code)) + 
   geom_point(size=3) + 
@@ -523,73 +489,8 @@ Feb_resids <- ggplot(Dataset.1.4, aes(x=fittedfeb, y=residfeb, colour = Colony_c
 Feb_resids
 # Even spread
 
-# acf on Feb model
-AR1_Feb <- lme(
-  fixed = Log_GA ~ Feb_effect,
-  random = ~ 1 | Colony_code,
-  correlation = corAR1(form = ~ Day_D1 | Colony_code),
-  data = Dataset.1.4,
-  method  = "ML",
-)
-summary(AR1_Feb) # phi 0
-anova(AR1_Feb)
-
-acf(resid(AR1_Feb))
-# no autocorrelation
-
-anova(Feb_model, AR1_Feb)
-# model without autoregressive structure is better 
-# no evidence that adding the AR(1) structure improves model fit
-
-# Top models
-# for model coefficients table use REML method
-
-# Feb effect model
-Feb_model <- lme(
-  fixed = Log_GA ~ Feb_effect,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(Feb_model)
-
-# R2 of the top model
-r.squaredGLMM(Feb_model)
-# random effects explaining most
-
-# null model
-null_model <- lme(
-  fixed = Log_GA ~ 1,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(null_model)
-
-# Day_d1 model
-log_reduced5_lmm <- lme(
-  fixed = Log_GA ~ Day_D1,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(log_reduced5_lmm)
-
-# sun el model
-log_reduced4_lmm <- lme(
-  fixed = Log_GA ~ MEANSUNEL,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(log_reduced4_lmm)
-
-# off-nadir model
-log_reduced1_lmm <- lme(
-  fixed = Log_GA ~ MEANOFFNADIRVIEWANGLE,
-  random = ~ 1 | Colony_code,
-  data = Dataset.1.4
-)
-summary(log_reduced1_lmm)
-
 ##########################################################################
-# GA and BP relationship (model created in Strang MSc thesis - Strang et al. 2025 RSEC)
+# GA and BP relationship (model created in Strang MSc thesis - Strang et al. 2026 RSEC)
 ##########################################################################
 
 # update to include more colonies
@@ -597,7 +498,6 @@ summary(log_reduced1_lmm)
 # Extract only interseasonal data and needed variables 
 Dataset.2.0 <- Dataset.1.0[,c("Colony_name","Season","GA","BP","Analysis2","Date")]
 View(Dataset.2.0)
-# check dates are 2009-2023
 
 # Keep only interseaonal data
 # interseasonal analysis for within season images is median estimate date
@@ -608,6 +508,7 @@ sum(is.na(Dataset.2.0$Analysis2))
 # Remove NAs
 Dataset.2.1 <- na.omit(Dataset.2.0)
 View(Dataset.2.1)
+# dates should be between 2009-2023
 
 Dataset.2.1$Log_GA <- log(Dataset.2.1$GA)
 Dataset.2.1$Log_BP <- log(Dataset.2.1$BP)
@@ -681,19 +582,6 @@ Feb_GA_BP <- lm(Dataset.2.2$Log_GA ~ Dataset.2.2$Log_BP + Dataset.2.2$Feb_effect
 summary(Feb_GA_BP)
 # Feb effect not significant
 
-# mixed Feb effect model
-Feb_mixed <- lme(
-  fixed = Log_GA ~ Log_BP + Feb_effect,
-  random = ~ 1 | Colony_name,
-  data = Dataset.2.2
-)
-summary(Feb_mixed)
-anova(Feb_mixed)
-# Feb effect not significant
-
-# R2 of the extended feb model
-r.squaredGLMM(Feb_mixed)
-
 # Make BP predictions from GA~BP model (model created in Strang MSc thesis)
 
 # model: Log GA = a + b * Log BP
@@ -709,9 +597,9 @@ r.squaredGLMM(Feb_mixed)
 # BP = exp((log(GA) - a) / b)
 
 # estimate breeding pair changes for GA changes within a season
-# coefficients from Feb_mixed model (under feb and average colony conditions)
-a <- -0.5047550 # intercept
-b <- 1.0567162 # slope
+# coefficients from Feb GA~BP model (under late-season conditions)
+a <- -0.30268 # intercept
+b <- 1.03348 # slope for BP
 
 GA <- c(
   Adare   = 105711,
