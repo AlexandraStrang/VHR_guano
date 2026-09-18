@@ -566,10 +566,10 @@ saveRDS(pred_list, file = "Inlabru_outputs/pred_list.rds")
 # b is slope of BP
 # c is slope of Feb_effect
 
-# coefficients from ms eq 2 (under average colony conditions)
-a <- -0.5047550 # intercept
-b <- 1.0567162 # slope
-c <- -0.1027524 # Feb_effect coefficient for December estimates
+# coefficients from ms eq 2 (under pre-feb conditions)
+a <- -0.30268 # intercept
+b <- 1.03348 # slope
+c <- -0.06816 # Feb_effect coefficient for December estimates
 
 # invert by:
 # Log_BP = (Log_GA - a) / b
