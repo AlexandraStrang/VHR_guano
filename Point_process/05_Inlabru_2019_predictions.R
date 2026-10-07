@@ -477,3 +477,29 @@ GA <- c(
 
 BP <- exp((log(GA) - a - c) / b)
 BP
+
+#############################################################################################
+# Guano only predictions - no spatial field
+##############################################################################################
+
+# 2019 G model predictions no field
+New_G_pred_2019 <- predict(
+  G_model,
+  newdata = geom_data,
+  ~{
+    eta <- Intercept + percentguano
+    mu  <- exp(eta) * area
+    list(expect = mu)
+  },
+  n.samples = 1000
+)
+
+summary(New_G_pred_2019)
+
+# calculate expected counts and overall abundance
+
+New_G_expected_2019 <- New_G_pred_2019$expect
+New_G_abundance_2019 <- sum(New_G_expected_2019$mean)
+
+# CRPS
+compute_crps_2019(New_G_pred_2019)
