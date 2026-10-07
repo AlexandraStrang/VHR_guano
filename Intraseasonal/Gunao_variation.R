@@ -262,6 +262,31 @@ plot(table_plot)
 
 # The larger the colony, the larger the variation
 
+# calculate and add mean date
+summary_table <- Dataset.1.4 %>%
+  group_by(Colony, Season) %>%
+  summarise(
+    n = n(),
+    mean_GA = mean(GA),
+    median_GA = median(GA),
+    sd = sd(GA),
+    CV = sd(GA) / mean(GA),
+    mean_date_days = approx(x = GA, y = Day_D1,
+                          xout = mean(GA), ties = mean, rule = 2)$y,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Convert back to original date
+    origin_date = as.Date(paste0(as.numeric(as.character(Season)) - 1, "-12-01")),
+    mean_date = origin_date + mean_date_days
+  )
+
+# Create a table plot
+table_plot <- ggtexttable(summary_table, rows = NULL)
+
+# Show table in Plots window
+plot(table_plot)
+
 ##########################################################################
 # Test for multi-colinearity between covariates
 ##########################################################################
