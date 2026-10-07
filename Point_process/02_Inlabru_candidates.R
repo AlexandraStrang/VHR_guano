@@ -582,3 +582,49 @@ GA <- c(
 
 BP <- exp((log(GA) - a - c) / b)
 BP
+
+#############################################################################################
+# Guano only predictions - no spatial field
+##############################################################################################
+
+# G model predictions
+New_G_pred <- predict(
+  G_model, counts_df,
+  ~{
+    expect <- exp(Intercept + 
+                    percentguano) * area
+    list(
+      expect = expect,
+      obs_prob = dpois(count, expect)
+    )
+  },
+  n.samples = 1000
+)
+
+# calculate expected counts, log-scores and overall abundance
+
+New_G_expected <- New_G_pred$expect
+New_G_expected$pred_var <- New_G_expected$mean + New_G_expected$sd^2
+New_G_expected$log_score <- -log(New_G_pred$obs_prob$mean)
+
+New_G_abundance <- sum(New_G_expected$mean)
+
+##############################################################################################
+# Get CPO values
+##############################################################################################
+
+set.seed(28)
+
+# check for failed approximations (% of observations) for each model
+mean(G_model$cpo$failure)
+
+# recompute failed approximations with more accurate grid-based integration
+G_model <- inla.cpo(G_model)
+
+# check failed approximations again
+mean(G_model$cpo$failure)
+
+
+# calculate CPO oer model
+G_model_CPO <- sum(-log(G_model$cpo$cpo), na.rm = TRUE)
+G_model_CPO
