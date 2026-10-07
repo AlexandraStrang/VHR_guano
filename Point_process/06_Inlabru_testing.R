@@ -181,12 +181,9 @@ matern <- inla.spde2.pcmatern(mesh = mesh_sub,
                               prior.range = c(100, 0.9), 
                               prior.sigma = c(0.01, 0.1))
 
-# Candidate model codes (8):
+# Candidate model codes:
 # G - percent guano only
-
 # N - Null model (spatial field only)
-
-# northness and eastness have some NAs
 
 # Guano model
 G_cmp <- ~ Intercept(1) +
@@ -427,4 +424,3 @@ GS_expected_2020 <- GS_pred_2020$expect
 GS_abundance_2020 <- sum(GS_expected_2020$mean)
 
 GS_abundance_2020 - observed_n_2020
-
